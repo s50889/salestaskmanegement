@@ -1,9 +1,9 @@
-import LoginForm from '@/components/forms/LoginForm';
+import SignupForm from '@/components/forms/SignupForm';
 
-export default function Home() {
+export default function SignupPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-      <LoginForm />
+      <SignupForm />
     </div>
   );
 }

@@ -1,0 +1,240 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import MainLayout from '@/components/layouts/MainLayout';
+import { getDeals, getCustomers, getSalesReps } from '@/lib/supabase/api';
+import { getUser } from '@/lib/supabase/client';
+import { Deal, Customer, SalesRep } from '@/types';
+import { formatCurrency, formatDate } from '@/lib/utils';
+
+export default function DealsPage() {
+  const router = useRouter();
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [salesRepFilter, setSalesRepFilter] = useState('');
+
+  // ステータスの日本語表示マッピング
+  const statusMapping: Record<string, { text: string, bgColor: string, textColor: string }> = {
+    negotiation: { text: '商談中', bgColor: 'bg-amber-100', textColor: 'text-amber-800' },
+    proposal: { text: '提案中', bgColor: 'bg-indigo-100', textColor: 'text-indigo-800' },
+    quotation: { text: '見積提出', bgColor: 'bg-blue-100', textColor: 'text-blue-800' },
+    final_negotiation: { text: '最終交渉', bgColor: 'bg-purple-100', textColor: 'text-purple-800' },
+    won: { text: '受注', bgColor: 'bg-green-100', textColor: 'text-green-800' },
+    lost: { text: '失注', bgColor: 'bg-red-100', textColor: 'text-red-800' },
+  };
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        // ユーザー情報の取得
+        const user = await getUser();
+        if (!user) {
+          // 未ログインの場合はログインページにリダイレクト
+          router.push('/');
+          return;
+        }
+        
+        // 案件、顧客、営業担当者のデータを取得
+        const [dealsData, customersData, salesRepsData] = await Promise.all([
+          getDeals(),
+          getCustomers(),
+          getSalesReps()
+        ]);
+        
+        setDeals(dealsData);
+        setCustomers(customersData);
+        setSalesReps(salesRepsData);
+      } catch (error) {
+        console.error('データ取得エラー:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [router]);
+
+  // 顧客名を取得する関数
+  const getCustomerName = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    return customer ? customer.name : '不明';
+  };
+
+  // 営業担当者名を取得する関数
+  const getSalesRepName = (salesRepId: string) => {
+    const salesRep = salesReps.find(rep => rep.id === salesRepId);
+    return salesRep ? salesRep.name : '不明';
+  };
+
+  // フィルタリングされた案件リストを取得
+  const filteredDeals = deals.filter(deal => {
+    const customerName = getCustomerName(deal.customer_id);
+    const matchesSearch = 
+      searchTerm === '' || 
+      deal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customerName.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === '' || deal.status === statusFilter;
+    const matchesSalesRep = salesRepFilter === '' || deal.sales_rep_id === salesRepFilter;
+    
+    return matchesSearch && matchesStatus && matchesSalesRep;
+  });
+
+  // 案件追加ページへ移動
+  const handleAddDeal = () => {
+    router.push('/deals/new');
+  };
+
+  // 案件詳細ページへ移動
+  const handleViewDetails = (id: string) => {
+    router.push(`/deals/${id}`);
+  };
+
+  // 案件編集ページへ移動
+  const handleEditDeal = (id: string) => {
+    router.push(`/deals/${id}/edit`);
+  };
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="space-y-6">
+          <h1 className="text-3xl font-bold">案件管理</h1>
+          <div className="rounded-lg border bg-card p-6 text-center">
+            <p className="text-muted-foreground">データ読み込み中...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  return (
+    <MainLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">案件管理</h1>
+          <button 
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            onClick={handleAddDeal}
+          >
+            案件を追加
+          </button>
+        </div>
+        
+        {/* 検索フィルター */}
+        <div className="flex flex-col gap-4 md:flex-row">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="案件名、顧客名で検索..."
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <select 
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">ステータス: すべて</option>
+              <option value="negotiation">商談中</option>
+              <option value="proposal">提案中</option>
+              <option value="quotation">見積提出</option>
+              <option value="final_negotiation">最終交渉</option>
+              <option value="won">受注</option>
+              <option value="lost">失注</option>
+            </select>
+            <select 
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              value={salesRepFilter}
+              onChange={(e) => setSalesRepFilter(e.target.value)}
+            >
+              <option value="">担当者: すべて</option>
+              {salesReps.map(rep => (
+                <option key={rep.id} value={rep.id}>{rep.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        
+        {/* 案件一覧 */}
+        <div className="rounded-lg border">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-3 text-left text-sm font-medium">案件名</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">顧客名</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">金額</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">粗利</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">ステータス</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">担当者</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">更新日</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDeals.length > 0 ? (
+                  filteredDeals.map(deal => (
+                    <tr key={deal.id} className="border-b">
+                      <td className="px-4 py-3 text-sm">{deal.name}</td>
+                      <td className="px-4 py-3 text-sm">{getCustomerName(deal.customer_id)}</td>
+                      <td className="px-4 py-3 text-sm">{formatCurrency(deal.amount)}</td>
+                      <td className="px-4 py-3 text-sm">{formatCurrency(deal.gross_profit || 0)}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`rounded-full ${statusMapping[deal.status]?.bgColor || 'bg-gray-100'} px-2 py-1 text-xs font-medium ${statusMapping[deal.status]?.textColor || 'text-gray-800'}`}>
+                          {statusMapping[deal.status]?.text || deal.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{getSalesRepName(deal.sales_rep_id)}</td>
+                      <td className="px-4 py-3 text-sm">{formatDate(deal.updated_at)}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex gap-2">
+                          <button 
+                            className="text-sm text-primary"
+                            onClick={() => handleViewDetails(deal.id)}
+                          >
+                            詳細
+                          </button>
+                          <button 
+                            className="text-sm text-primary"
+                            onClick={() => handleEditDeal(deal.id)}
+                          >
+                            編集
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                      案件データがありません
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        {/* ページネーション（実装は省略） */}
+        {filteredDeals.length > 0 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              全 {filteredDeals.length} 件を表示
+            </p>
+            {/* ページネーションは将来的に実装 */}
+          </div>
+        )}
+      </div>
+    </MainLayout>
+  );
+}
