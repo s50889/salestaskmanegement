@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getCustomers, getDeals, getSalesReps } from '@/lib/supabase/api';
 import { getUser } from '@/lib/supabase/client';
@@ -10,6 +10,29 @@ import { Customer, Deal, SalesRep } from '@/types';
 import Link from 'next/link';
 
 export default function NewActivityPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <NewActivityContent />
+    </Suspense>
+  );
+}
+
+// ローディング状態のコンポーネント
+function LoadingState() {
+  return (
+    <MainLayout>
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">活動を記録</h1>
+        <div className="rounded-lg border bg-card p-6 text-center">
+          <p className="text-muted-foreground">読み込み中...</p>
+        </div>
+      </div>
+    </MainLayout>
+  );
+}
+
+// メインコンテンツコンポーネント
+function NewActivityContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
