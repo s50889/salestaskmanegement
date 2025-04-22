@@ -32,6 +32,7 @@ export default function SignupForm() {
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
           data: {
             name: name,
             full_name: name, // 代替フィールドとして追加
