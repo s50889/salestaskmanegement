@@ -296,9 +296,7 @@ export default function DealForm({ deal, customers, salesReps, onSuccess }: Deal
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="negotiation">商談中</option>
-            <option value="proposal">提案中</option>
             <option value="quotation">見積提出</option>
-            <option value="final_negotiation">最終交渉</option>
             <option value="won">受注</option>
             <option value="lost">失注</option>
           </select>

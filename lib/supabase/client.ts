@@ -26,3 +26,28 @@ export const getUser = async () => {
   }
   return user;
 };
+
+// パスワードを更新する
+export const updatePassword = async (newPassword: string): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    
+    if (error) {
+      console.error('パスワード更新エラー:', error);
+      return { 
+        success: false, 
+        error: error.message || 'パスワードの更新に失敗しました。' 
+      };
+    }
+    
+    return { success: true, error: null };
+  } catch (err) {
+    console.error('パスワード更新中に例外が発生しました:', err);
+    return { 
+      success: false, 
+      error: '予期せぬエラーが発生しました。もう一度お試しください。' 
+    };
+  }
+};

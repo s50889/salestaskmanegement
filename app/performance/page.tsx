@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import MainLayout from '@/components/layouts/MainLayout';
 import { getUser } from '@/lib/supabase/client';
-import { getSalesReps, getSalesRepPerformance } from '@/lib/supabase/api';
-import { SalesRepPerformance } from '@/types';
+import { getSalesReps, getSalesRepPerformance, getDepartments } from '@/lib/supabase/api';
+import { SalesRepPerformance, Department } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -25,9 +24,11 @@ type ChartData = {
 
 type CompareMetric = '受注' | '商談中';
 
-export default function CompareRepsPage() {
+export default function PerformancePage() {
   const router = useRouter();
   const [salesReps, setSalesReps] = useState<SalesRepPerformance[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,10 @@ export default function CompareRepsPage() {
         
         // 営業担当者の一覧を取得
         const reps = await getSalesReps();
+        
+        // 部署一覧を取得
+        const departmentsData = await getDepartments();
+        setDepartments(departmentsData);
         
         // 現在のユーザーが管理者かどうかを確認
         const currentRep = reps.find(rep => rep.user_id === user.id);
@@ -82,9 +87,18 @@ export default function CompareRepsPage() {
     fetchData();
   }, [router, compareMetric]);
 
+  // 部署でフィルタリングされたデータを取得
+  const getFilteredSalesReps = () => {
+    if (selectedDepartment === 'all') {
+      return salesReps;
+    }
+    
+    return salesReps.filter(rep => rep.department_id === selectedDepartment);
+  };
+
   // グラフ用のデータを準備
   const prepareChartData = (): ChartData[] => {
-    let data = salesReps.map(rep => ({
+    let data = getFilteredSalesReps().map(rep => ({
       name: rep.name,
       受注金額: rep.wonAmount,
       商談中金額: rep.inProgressAmount,
@@ -107,7 +121,7 @@ export default function CompareRepsPage() {
     return String(value);
   };
 
-  // ツールチップのカスタマイズ
+  // カスタムツールチップの実装
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -144,7 +158,7 @@ export default function CompareRepsPage() {
     return (
       <MainLayout>
         <div className="space-y-6">
-          <h1 className="text-3xl font-bold">営業担当者比較</h1>
+          <h1 className="text-3xl font-bold">営業成績一覧</h1>
           <div className="rounded-lg border bg-card p-6 shadow-sm">
             <p className="text-muted-foreground">データを読み込み中...</p>
           </div>
@@ -157,7 +171,7 @@ export default function CompareRepsPage() {
     return (
       <MainLayout>
         <div className="space-y-6">
-          <h1 className="text-3xl font-bold">営業担当者比較</h1>
+          <h1 className="text-3xl font-bold">営業成績一覧</h1>
           <div className="rounded-lg border bg-destructive/10 p-6 shadow-sm">
             <p className="text-destructive">{error}</p>
           </div>
@@ -173,15 +187,7 @@ export default function CompareRepsPage() {
     <MainLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">営業担当者比較</h1>
-          <div className="flex gap-2">
-            <Link 
-              href="/sales-reps" 
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              一覧表示
-            </Link>
-          </div>
+          <h1 className="text-3xl font-bold">営業成績一覧</h1>
         </div>
         
         {/* コントロールパネル */}
@@ -203,16 +209,36 @@ export default function CompareRepsPage() {
               </button>
             </div>
           </div>
+          
+          <div className="space-y-1">
+            <label className="text-sm font-medium">部署選択</label>
+            <select
+              value={selectedDepartment}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+              className="px-3 py-1.5 border rounded-md bg-background text-sm"
+            >
+              <option value="all">全ての部署</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         
-        {salesReps.length === 0 ? (
+        {getFilteredSalesReps().length === 0 ? (
           <div className="rounded-lg border bg-card p-6 shadow-sm">
             <p className="text-muted-foreground">表示するデータがありません</p>
           </div>
         ) : (
           <div className="space-y-6">
             <div className="rounded-lg border bg-card p-6 shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">{compareMetric === '受注' ? '受注状況比較' : '商談中状況比較'}</h2>
+              <h2 className="text-xl font-semibold mb-4">
+                {selectedDepartment !== 'all' ? 
+                  `${departments.find(d => d.id === selectedDepartment)?.name || ''} - ` : ''}
+                {compareMetric === '受注' ? '受注状況比較' : '商談中状況比較'}
+              </h2>
               <div className="h-[600px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart

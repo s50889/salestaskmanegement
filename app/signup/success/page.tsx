@@ -11,7 +11,7 @@ export default function SignupSuccessPage() {
         
         <div className="rounded-md bg-green-50 p-4 text-center text-green-800">
           <p className="mb-2">ご登録いただきありがとうございます。</p>
-          <p className="text-sm">確認メールをお送りしました。メールのリンクをクリックして登録を完了してください。</p>
+          <p className="text-sm">アカウントの登録が完了しました。ログインして営業活動を開始しましょう。</p>
         </div>
         
         <div className="flex justify-center">

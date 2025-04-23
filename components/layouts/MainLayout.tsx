@@ -119,7 +119,31 @@ export default function MainLayout({ children }: MainLayoutProps) {
             className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/sales-reps')}`}
           >
             <span className="mr-2">👨‍💼</span>
-            営業案件一覧表
+            担当者別案件状況
+          </Link>
+          
+          <Link 
+            href="/departments" 
+            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/departments')}`}
+          >
+            <span className="mr-2">🏢</span>
+            部署別案件状況
+          </Link>
+
+          <Link 
+            href="/performance" 
+            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/performance')}`}
+          >
+            <span className="mr-2">📈</span>
+            営業成績一覧
+          </Link>
+
+          <Link 
+            href="/profile" 
+            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/profile')}`}
+          >
+            <span className="mr-2">👤</span>
+            プロフィール
           </Link>
         </nav>
       </aside>

@@ -40,31 +40,47 @@ type DealAmountStats = {
   }[];
 };
 
-export default function DealAmountChart() {
+interface DealAmountChartProps {
+  dealAmountStats?: any;
+}
+
+export default function DealAmountChart({ dealAmountStats }: DealAmountChartProps) {
   const [stats, setStats] = useState<DealAmountStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'inProgress' | 'won'>('inProgress');
 
   useEffect(() => {
+    // 親コンポーネントから渡されたデータがある場合はそれを使用
+    if (dealAmountStats) {
+      setStats(dealAmountStats);
+      setLoading(false);
+      return;
+    }
+    
+    // 渡されたデータがない場合は自分でデータを取得
     async function fetchData() {
       try {
-        const data = await getDealAmountStats();
-        if (data) {
-          setStats(data);
-        } else {
-          setError('データの取得に失敗しました');
-        }
+        const amountStats = await getDealAmountStats();
+        setStats(amountStats);
       } catch (error) {
-        console.error('Error fetching deal stats:', error);
-        setError('エラーが発生しました');
+        console.error('案件金額データの取得に失敗しました:', error);
+        setError('データの取得に失敗しました');
       } finally {
         setLoading(false);
       }
     }
 
     fetchData();
-  }, []);
+  }, []);  
+  
+  // 親から渡されたデータが変更されたときに再レンダリング
+  useEffect(() => {
+    if (dealAmountStats) {
+      setStats(dealAmountStats);
+      setLoading(false);
+    }
+  }, [dealAmountStats]);
 
   // データを更新する関数
   const handleRefreshData = async () => {

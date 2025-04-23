@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import MainLayout from '@/components/layouts/MainLayout';
-import { getDeals, getCustomers, getSalesReps } from '@/lib/supabase/api';
+import { getDeals, getCustomers, getSalesReps, getDepartments } from '@/lib/supabase/api';
 import { getUser } from '@/lib/supabase/client';
-import { Deal, Customer, SalesRep } from '@/types';
+import { Deal, Customer, SalesRep, Department } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 export default function DealsPage() {
@@ -13,10 +13,12 @@ export default function DealsPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [salesRepFilter, setSalesRepFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
 
   // ステータスの日本語表示マッピング
   const statusMapping: Record<string, { text: string, bgColor: string, textColor: string }> = {
@@ -39,16 +41,18 @@ export default function DealsPage() {
           return;
         }
         
-        // 案件、顧客、営業担当者のデータを取得
-        const [dealsData, customersData, salesRepsData] = await Promise.all([
+        // 案件、顧客、営業担当者、部署のデータを取得
+        const [dealsData, customersData, salesRepsData, departmentsData] = await Promise.all([
           getDeals(),
           getCustomers(),
-          getSalesReps()
+          getSalesReps(),
+          getDepartments()
         ]);
         
         setDeals(dealsData);
         setCustomers(customersData);
         setSalesReps(salesRepsData);
+        setDepartments(departmentsData);
       } catch (error) {
         console.error('データ取得エラー:', error);
       } finally {
@@ -60,20 +64,18 @@ export default function DealsPage() {
   }, [router]);
 
   // 顧客名を取得する関数
-  const getCustomerName = (customerId: string) => {
-    const customer = customers.find(c => c.id === customerId);
-    return customer ? customer.name : '不明';
+  const getCustomerName = (deal: Deal) => {
+    return deal.customer?.name || '不明';
   };
 
   // 営業担当者名を取得する関数
-  const getSalesRepName = (salesRepId: string) => {
-    const salesRep = salesReps.find(rep => rep.id === salesRepId);
-    return salesRep ? salesRep.name : '不明';
+  const getSalesRepName = (deal: Deal) => {
+    return deal.sales_rep?.name || '不明';
   };
 
   // フィルタリングされた案件リストを取得
   const filteredDeals = deals.filter(deal => {
-    const customerName = getCustomerName(deal.customer_id);
+    const customerName = deal.customer?.name || '';
     const matchesSearch = 
       searchTerm === '' || 
       deal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -82,7 +84,10 @@ export default function DealsPage() {
     const matchesStatus = statusFilter === '' || deal.status === statusFilter;
     const matchesSalesRep = salesRepFilter === '' || deal.sales_rep_id === salesRepFilter;
     
-    return matchesSearch && matchesStatus && matchesSalesRep;
+    // 部署フィルター: 部署が選択されている場合は、その部署に所属する営業担当者の案件のみを表示
+    const matchesDepartment = departmentFilter === '' || (deal.sales_rep?.department_id === departmentFilter);
+    
+    return matchesSearch && matchesStatus && matchesSalesRep && matchesDepartment;
   });
 
   // 案件追加ページへ移動
@@ -161,6 +166,16 @@ export default function DealsPage() {
                 <option key={rep.id} value={rep.id}>{rep.name}</option>
               ))}
             </select>
+            <select 
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+            >
+              <option value="">部署: すべて</option>
+              {departments.map(department => (
+                <option key={department.id} value={department.id}>{department.name}</option>
+              ))}
+            </select>
           </div>
         </div>
         
@@ -185,15 +200,15 @@ export default function DealsPage() {
                   filteredDeals.map(deal => (
                     <tr key={deal.id} className="border-b">
                       <td className="px-4 py-3 text-sm">{deal.name}</td>
-                      <td className="px-4 py-3 text-sm">{getCustomerName(deal.customer_id)}</td>
-                      <td className="px-4 py-3 text-sm">{formatCurrency(deal.amount)}</td>
-                      <td className="px-4 py-3 text-sm">{formatCurrency(deal.gross_profit || 0)}</td>
+                      <td className="px-4 py-3 text-sm">{getCustomerName(deal)}</td>
+                      <td className="px-4 py-3 text-sm">{formatCurrency(Number(deal.amount))}</td>
+                      <td className="px-4 py-3 text-sm">{formatCurrency(Number(deal.gross_profit || 0))}</td>
                       <td className="px-4 py-3 text-sm">
                         <span className={`rounded-full ${statusMapping[deal.status]?.bgColor || 'bg-gray-100'} px-2 py-1 text-xs font-medium ${statusMapping[deal.status]?.textColor || 'text-gray-800'}`}>
                           {statusMapping[deal.status]?.text || deal.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm">{getSalesRepName(deal.sales_rep_id)}</td>
+                      <td className="px-4 py-3 text-sm">{getSalesRepName(deal)}</td>
                       <td className="px-4 py-3 text-sm">{formatDate(deal.updated_at)}</td>
                       <td className="px-4 py-3 text-sm">
                         <div className="flex gap-2">

@@ -5,16 +5,24 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import MainLayout from '@/components/layouts/MainLayout';
 import { getUser } from '@/lib/supabase/client';
-import { getSalesReps, getSalesRepPerformance } from '@/lib/supabase/api';
-import { SalesRep, SalesRepPerformance } from '@/types';
+import { getSalesReps, getSalesRepPerformance, getDepartments } from '@/lib/supabase/api';
+import { SalesRep, SalesRepPerformance, Department } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 
 export default function SalesRepsPage() {
   const router = useRouter();
   const [salesReps, setSalesReps] = useState<SalesRepPerformance[]>([]);
+  const [filteredReps, setFilteredReps] = useState<SalesRepPerformance[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserData, setCurrentUserData] = useState<SalesRepPerformance | null>(null);
+  const [viewMode, setViewMode] = useState<'all' | 'personal'>('all');
   const [error, setError] = useState<string | null>(null);
+  
+  // 絞り込み用のステート
+  const [nameFilter, setNameFilter] = useState('');
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentFilter, setDepartmentFilter] = useState('');
 
   useEffect(() => {
     async function fetchData() {
@@ -30,25 +38,46 @@ export default function SalesRepsPage() {
         // 営業担当者の一覧を取得
         const reps = await getSalesReps();
         
+        // 部署一覧を取得
+        const departmentsData = await getDepartments();
+        setDepartments(departmentsData);
+        
         // 現在のユーザーが管理者かどうかを確認
         const currentRep = reps.find(rep => rep.user_id === user.id);
-        setIsAdmin(currentRep?.role === 'admin' || currentRep?.role === 'manager');
+        const isAdminOrManager = currentRep?.role === 'admin' || currentRep?.role === 'manager';
+        setIsAdmin(isAdminOrManager);
         
-        if (currentRep?.role === 'admin' || currentRep?.role === 'manager') {
+        if (isAdminOrManager) {
           // 管理者またはマネージャーの場合、全営業担当者のパフォーマンスを取得
           const performanceData = await getSalesRepPerformance();
+          
+          // マネージャー自身のデータを保存
+          if (currentRep) {
+            const myPerformance = await getSalesRepPerformance(currentRep.id);
+            if (myPerformance && !Array.isArray(myPerformance)) {
+              setCurrentUserData(myPerformance as SalesRepPerformance);
+            }
+          }
+          
           if (performanceData && Array.isArray(performanceData)) {
-            setSalesReps(performanceData as SalesRepPerformance[]);
+            const data = performanceData as SalesRepPerformance[];
+            setSalesReps(data);
+            setFilteredReps(data);
           } else {
             setSalesReps([]);
+            setFilteredReps([]);
           }
         } else {
           // 一般営業担当者の場合、自分のデータのみ取得
           const myPerformance = await getSalesRepPerformance(currentRep?.id);
           if (myPerformance && !Array.isArray(myPerformance)) {
-            setSalesReps([myPerformance as SalesRepPerformance]);
+            const data = [myPerformance as SalesRepPerformance];
+            setSalesReps(data);
+            setFilteredReps(data);
+            setCurrentUserData(myPerformance as SalesRepPerformance);
           } else {
             setSalesReps([]);
+            setFilteredReps([]);
           }
         }
       } catch (error) {
@@ -62,6 +91,40 @@ export default function SalesRepsPage() {
     fetchData();
   }, [router]);
 
+  // 絞り込み処理を行う関数
+  useEffect(() => {
+    // まず、表示モードに基づいてベースとなるデータを選択
+    let baseData: SalesRepPerformance[] = [];
+    
+    if (viewMode === 'all' || !currentUserData) {
+      baseData = [...salesReps];
+    } else {
+      // 個人表示モードの場合は自分のデータのみ
+      baseData = currentUserData ? [currentUserData] : [];
+    }
+    
+    // 名前で絞り込み
+    let result = baseData;
+    if (nameFilter) {
+      result = result.filter(rep => 
+        rep.name.toLowerCase().includes(nameFilter.toLowerCase())
+      );
+    }
+    
+    // 部署で絞り込み
+    if (departmentFilter) {
+      result = result.filter(rep => rep.department_id === departmentFilter);
+    }
+    
+    setFilteredReps(result);
+  }, [nameFilter, departmentFilter, salesReps, viewMode, currentUserData]);
+
+  // フィルターをリセットする
+  const resetFilters = () => {
+    setNameFilter('');
+    setDepartmentFilter('');
+  };
+
   // 営業担当者の詳細ページへのリンク
   const handleViewDetails = (salesRepId: string) => {
     router.push(`/sales-reps/${salesRepId}`);
@@ -71,7 +134,8 @@ export default function SalesRepsPage() {
     return (
       <MainLayout>
         <div className="space-y-6">
-          <h1 className="text-3xl font-bold">営業案件一覧表</h1>
+          <h1 className="text-3xl font-bold">担当者別案件状況
+          </h1>
           <div className="rounded-lg border bg-card p-6 shadow-sm">
             <p className="text-muted-foreground">データを読み込み中...</p>
           </div>
@@ -97,26 +161,106 @@ export default function SalesRepsPage() {
     <MainLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">営業案件一覧表</h1>
-          {isAdmin && (
-            <div className="flex gap-2">
+          <h1 className="text-3xl font-bold">担当者別案件状況</h1>
+          <div className="flex gap-2">
+            {isAdmin && (
               <Link 
                 href="/sales-reps/compare" 
                 className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
                 グラフ比較
               </Link>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         
-        {salesReps.length === 0 ? (
+        {/* マネージャー向けの表示切替タブ */}
+        {isAdmin && currentUserData && (
+          <div className="flex border-b">
+            <button
+              onClick={() => setViewMode('all')}
+              className={`px-4 py-2 font-medium text-sm border-b-2 ${
+                viewMode === 'all' 
+                  ? 'border-primary text-primary' 
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              全営業担当表示
+            </button>
+            <button
+              onClick={() => setViewMode('personal')}
+              className={`px-4 py-2 font-medium text-sm border-b-2 ${
+                viewMode === 'personal' 
+                  ? 'border-primary text-primary' 
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              自分の実績のみ表示
+            </button>
+          </div>
+        )}
+        
+        {/* 絞り込みフォーム */}
+        <div className="rounded-lg border bg-card p-4 shadow-sm">
+          <h2 className="text-lg font-semibold mb-3">絞り込み検索</h2>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[200px]">
+              <label htmlFor="nameFilter" className="block text-sm font-medium mb-1">
+                名前で検索
+              </label>
+              <input
+                id="nameFilter"
+                type="text"
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+                placeholder="営業担当者名を入力"
+                className="w-full rounded-md border p-2 text-sm"
+              />
+            </div>
+            
+            <div className="flex-1 min-w-[200px]">
+              <label htmlFor="departmentFilter" className="block text-sm font-medium mb-1">
+                部署で絞り込み
+              </label>
+              <select
+                id="departmentFilter"
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="w-full rounded-md border p-2 text-sm"
+              >
+                <option value="">すべての部署</option>
+                {departments.map(dept => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex items-end">
+              <button
+                onClick={resetFilters}
+                className="rounded-md bg-muted px-4 py-2 text-sm font-medium hover:bg-muted/80"
+              >
+                リセット
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 text-sm text-muted-foreground">
+            検索結果: {filteredReps.length} 件
+            {viewMode === 'personal' && isAdmin && (
+              <span className="ml-2 font-medium text-primary">※ 自分の実績のみ表示中</span>
+            )}
+          </div>
+        </div>
+        
+        {filteredReps.length === 0 ? (
           <div className="rounded-lg border bg-card p-6 shadow-sm">
             <p className="text-muted-foreground">表示するデータがありません</p>
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {salesReps.map(rep => (
+            {filteredReps.map(rep => (
               <div 
                 key={rep.salesRepId} 
                 className="rounded-lg border bg-card p-6 shadow-sm hover:shadow-md transition-shadow cursor-pointer"

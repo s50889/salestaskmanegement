@@ -1,18 +1,40 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
+import { getDepartments } from '@/lib/supabase/api';
+import { Department } from '@/types';
 
 export default function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  // 部署データの取得
+  useEffect(() => {
+    async function fetchDepartments() {
+      try {
+        const deptData = await getDepartments();
+        setDepartments(deptData);
+        // 部署データがある場合、デフォルトで最初の部署を選択
+        if (deptData && deptData.length > 0) {
+          setSelectedDepartmentId(deptData[0].id);
+        }
+      } catch (err) {
+        console.error('部署データ取得エラー:', err);
+      }
+    }
+
+    fetchDepartments();
+  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +93,8 @@ export default function SignupForm() {
                 user_id: data.user.id,
                 name: name,
                 email: email,
-                role: 'sales_rep'
+                role: 'sales_rep',
+                department_id: selectedDepartmentId || null
               }
             ]);
           
@@ -178,6 +201,25 @@ export default function SignupForm() {
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
             placeholder="••••••••"
           />
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="department" className="text-sm font-medium">
+            部署
+          </label>
+          <select
+            id="department"
+            value={selectedDepartmentId}
+            onChange={(e) => setSelectedDepartmentId(e.target.value)}
+            required
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+          >
+            {departments.map((dept) => (
+              <option key={dept.id} value={dept.id}>
+                {dept.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <button

@@ -237,15 +237,14 @@ export default function SalesRepDetailPage() {
                           <td className="px-4 py-3 text-sm">{deal.customer?.name || '不明'}</td>
                           <td className="px-4 py-3 text-sm">
                             <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${
-                              deal.status === 'won' ? 'bg-green-100 text-green-800' :
                               deal.status === 'lost' ? 'bg-red-100 text-red-800' :
-                              deal.status === 'negotiation' || deal.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                              deal.status === 'negotiation' || deal.status === 'quotation' ? 'bg-blue-100 text-blue-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
                               {deal.status === 'won' ? '受注' :
                                deal.status === 'lost' ? '失注' :
-                               deal.status === 'negotiation' || deal.status === 'in_progress' ? '商談中' : 
-                               deal.status === 'on_hold' ? '保留中' :
+                               deal.status === 'negotiation' ? '商談中' : 
+                               deal.status === 'quotation' ? '見積提出' :
                                deal.status}
                             </span>
                           </td>
@@ -290,15 +289,17 @@ export default function SalesRepDetailPage() {
                           <td className="px-4 py-3 text-sm">{formatDate(activity.created_at)}</td>
                           <td className="px-4 py-3 text-sm">
                             <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${
-                              activity.type === 'call' ? 'bg-blue-100 text-blue-800' :
-                              activity.type === 'meeting' ? 'bg-purple-100 text-purple-800' :
-                              activity.type === 'email' ? 'bg-green-100 text-green-800' :
+                              activity.activity_type === 'phone' ? 'bg-amber-100 text-amber-800' :
+                              activity.activity_type === 'visit' ? 'bg-blue-100 text-blue-800' :
+                              activity.activity_type === 'email' ? 'bg-green-100 text-green-800' :
+                              activity.activity_type === 'web_meeting' ? 'bg-purple-100 text-purple-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {activity.type === 'call' ? '電話' :
-                               activity.type === 'meeting' ? '会議' :
-                               activity.type === 'email' ? 'メール' : 
-                               activity.type}
+                              {activity.activity_type === 'phone' ? '電話' :
+                               activity.activity_type === 'visit' ? '訪問' :
+                               activity.activity_type === 'email' ? 'メール' : 
+                               activity.activity_type === 'web_meeting' ? 'Web会議' :
+                               activity.activity_type}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm">{activity.customer?.name || '不明'}</td>

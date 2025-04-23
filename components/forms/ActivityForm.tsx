@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity, Customer, Deal, SalesRep } from '@/types';
 import { createActivity, updateActivity } from '@/lib/supabase/api';
+import { getUser } from '@/lib/supabase/client';
 
 type ActivityFormProps = {
   activity?: Activity;
@@ -29,6 +30,7 @@ export default function ActivityForm({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentSalesRepId, setCurrentSalesRepId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     customer_id: '',
@@ -41,6 +43,27 @@ export default function ActivityForm({
 
   // 選択された顧客に関連する案件のリスト
   const [filteredDeals, setFilteredDeals] = useState<Deal[]>([]);
+
+  // ログインユーザーの営業担当者IDを取得
+  useEffect(() => {
+    async function getCurrentSalesRep() {
+      try {
+        const user = await getUser();
+        if (!user) return;
+        
+        const currentRep = salesReps.find(rep => rep.user_id === user.id);
+        if (currentRep) {
+          setCurrentSalesRepId(currentRep.id);
+          // フォームデータに自動的に営業担当者IDをセット
+          setFormData(prev => ({ ...prev, sales_rep_id: currentRep.id }));
+        }
+      } catch (error) {
+        console.error('営業担当者情報の取得に失敗:', error);
+      }
+    }
+    
+    getCurrentSalesRep();
+  }, [salesReps]);
 
   useEffect(() => {
     // 編集モードの場合、既存の活動データをフォームに設定
@@ -99,10 +122,10 @@ export default function ActivityForm({
     setError(null);
 
     try {
-      // deal_idが空文字の場合はnullに変換
+      // deal_idが空文字の場合はundefinedに変換（nullではなく）
       const activityData = {
         ...formData,
-        deal_id: formData.deal_id || null
+        deal_id: formData.deal_id || undefined
       };
 
       if (activity) {
@@ -218,25 +241,21 @@ export default function ActivityForm({
           )}
         </div>
 
+        {/* 担当者入力フィールドを削除して、代わりに現在の担当者名を表示 */}
         <div className="space-y-2">
-          <label htmlFor="sales_rep_id" className="text-sm font-medium">
-            担当者 <span className="text-destructive">*</span>
+          <label className="text-sm font-medium">
+            担当者
           </label>
-          <select
-            id="sales_rep_id"
-            name="sales_rep_id"
-            value={formData.sales_rep_id}
-            onChange={handleChange}
-            required
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          >
-            <option value="">選択してください</option>
-            {salesReps.map(rep => (
-              <option key={rep.id} value={rep.id}>
-                {rep.name}
-              </option>
-            ))}
-          </select>
+          <div className="w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+            {currentSalesRepId ? 
+              salesReps.find(rep => rep.id === currentSalesRepId)?.name || '不明' 
+              : '読み込み中...'}
+            <input 
+              type="hidden" 
+              name="sales_rep_id" 
+              value={formData.sales_rep_id} 
+            />
+          </div>
         </div>
 
         <div className="space-y-2 md:col-span-2">
