@@ -91,6 +91,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </Link>
           
           <Link 
+            href="/my-deals" 
+            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/my-deals')}`}
+          >
+            <span className="mr-2">📋</span>
+            個人案件一覧
+          </Link>
+          
+          <Link 
             href="/activities" 
             className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/activities')}`}
           >
