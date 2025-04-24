@@ -226,14 +226,7 @@ export default function SalesRepsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">担当者別案件状況</h1>
           <div className="flex gap-2">
-            {isAdmin && (
-              <Link 
-                href="/sales-reps/compare" 
-                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                グラフ比較
-              </Link>
-            )}
+            {/* グラフ比較ボタンを削除 */}
           </div>
         </div>
         
