@@ -83,14 +83,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </Link>
           
           <Link 
-            href="/customers" 
-            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/customers')}`}
-          >
-            <span className="mr-2">👥</span>
-            顧客管理
-          </Link>
-          
-          <Link 
             href="/deals" 
             className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/deals')}`}
           >
@@ -107,11 +99,27 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </Link>
           
           <Link 
+            href="/customers" 
+            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/customers')}`}
+          >
+            <span className="mr-2">👥</span>
+            顧客管理
+          </Link>
+          
+          <Link 
             href="/settings" 
             className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/settings')}`}
           >
             <span className="mr-2">⚙️</span>
             設定
+          </Link>
+          
+          <Link 
+            href="/performance" 
+            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/performance')}`}
+          >
+            <span className="mr-2">📈</span>
+            営業成績一覧
           </Link>
           
           <Link 
@@ -128,14 +136,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
           >
             <span className="mr-2">🏢</span>
             部署別案件状況
-          </Link>
-
-          <Link 
-            href="/performance" 
-            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/performance')}`}
-          >
-            <span className="mr-2">📈</span>
-            営業成績一覧
           </Link>
 
           <Link 

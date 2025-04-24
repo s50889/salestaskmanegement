@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCustomers, getSalesReps } from '@/lib/supabase/api';
+import { getCustomers, getSalesReps, getSalesRepByUserId } from '@/lib/supabase/api';
 import { getUser } from '@/lib/supabase/client';
 import MainLayout from '@/components/layouts/MainLayout';
 import DealForm from '@/components/forms/DealForm';
@@ -12,6 +12,7 @@ export default function NewDealPage() {
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
+  const [currentSalesRep, setCurrentSalesRep] = useState<SalesRep | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,6 +34,12 @@ export default function NewDealPage() {
         
         setCustomers(customersData);
         setSalesReps(salesRepsData);
+        
+        // ログインユーザーの営業担当者情報を取得
+        const currentUserSalesRep = await getSalesRepByUserId(user.id);
+        if (currentUserSalesRep) {
+          setCurrentSalesRep(currentUserSalesRep);
+        }
       } catch (error) {
         console.error('データ取得エラー:', error);
       } finally {
@@ -61,7 +68,11 @@ export default function NewDealPage() {
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">案件登録</h1>
         <div className="rounded-lg border bg-card p-6">
-          <DealForm customers={customers} salesReps={salesReps} />
+          <DealForm 
+            customers={customers} 
+            salesReps={salesReps} 
+            currentSalesRep={currentSalesRep}
+          />
         </div>
       </div>
     </MainLayout>

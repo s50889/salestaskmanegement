@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import MainLayout from '@/components/layouts/MainLayout';
 import { getUser } from '@/lib/supabase/client';
-import { getSalesReps, getSalesRepPerformance, getDepartments } from '@/lib/supabase/api';
-import { SalesRep, SalesRepPerformance, Department } from '@/types';
+import { getSalesReps, getSalesRepPerformance, getDepartments, getDepartmentGroups, getSalesRepGroup } from '@/lib/supabase/api';
+import { SalesRep, SalesRepPerformance, Department, DepartmentGroup, SalesRepGroup } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 
 export default function SalesRepsPage() {
@@ -23,6 +23,14 @@ export default function SalesRepsPage() {
   const [nameFilter, setNameFilter] = useState('');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentFilter, setDepartmentFilter] = useState('');
+  
+  // グループ絞り込み用のステート
+  const [departmentGroups, setDepartmentGroups] = useState<DepartmentGroup[]>([]);
+  const [groupFilter, setGroupFilter] = useState('');
+  const [salesRepGroups, setSalesRepGroups] = useState<Record<string, string>>({});
+
+  // 第一営業部のID
+  const FIRST_DEPARTMENT_ID = 'cc22f892-b2e1-425d-8472-385bacbc9da8';
 
   useEffect(() => {
     async function fetchData() {
@@ -90,6 +98,41 @@ export default function SalesRepsPage() {
 
     fetchData();
   }, [router]);
+  
+  // 部署フィルターが変更されたときにグループ一覧を取得
+  useEffect(() => {
+    async function fetchDepartmentGroups() {
+      if (departmentFilter === FIRST_DEPARTMENT_ID) {
+        try {
+          const groups = await getDepartmentGroups(FIRST_DEPARTMENT_ID);
+          setDepartmentGroups(groups);
+          
+          // 第一営業部が選択された場合、営業担当者のグループ情報を再取得
+          const groupsMap: Record<string, string> = {};
+          
+          // 絞り込まれた営業担当者に対してグループ情報を取得
+          for (const rep of salesReps.filter(rep => rep.department_id === FIRST_DEPARTMENT_ID)) {
+            const groupInfo = await getSalesRepGroup(rep.salesRepId);
+            if (groupInfo) {
+              groupsMap[rep.salesRepId] = groupInfo.department_group_id;
+              console.log(`営業担当者 ${rep.name} (${rep.salesRepId}) のグループID: ${groupInfo.department_group_id}`);
+            }
+          }
+          
+          console.log('営業担当者グループマッピング:', groupsMap);
+          setSalesRepGroups(groupsMap);
+        } catch (error) {
+          console.error('グループデータ取得エラー:', error);
+          setDepartmentGroups([]);
+        }
+      } else {
+        setDepartmentGroups([]);
+        setGroupFilter('');
+      }
+    }
+    
+    fetchDepartmentGroups();
+  }, [departmentFilter, salesReps]);
 
   // 絞り込み処理を行う関数
   useEffect(() => {
@@ -114,15 +157,35 @@ export default function SalesRepsPage() {
     // 部署で絞り込み
     if (departmentFilter) {
       result = result.filter(rep => rep.department_id === departmentFilter);
+      console.log(`部署フィルター適用後: ${result.length}件`);
+      console.log('部署フィルター適用後の営業担当者:', result.map(rep => rep.name));
+      
+      // 第一営業部かつグループフィルターが指定されている場合
+      if (departmentFilter === FIRST_DEPARTMENT_ID && groupFilter) {
+        console.log(`グループフィルター: ${groupFilter}`);
+        console.log('営業担当者グループマッピング:', salesRepGroups);
+        
+        result = result.filter(rep => {
+          const hasGroup = rep.salesRepId in salesRepGroups;
+          const isMatchingGroup = salesRepGroups[rep.salesRepId] === groupFilter;
+          
+          console.log(`営業担当者 ${rep.name} (${rep.salesRepId}): グループあり=${hasGroup}, グループ一致=${isMatchingGroup}`);
+          
+          return isMatchingGroup;
+        });
+        console.log(`グループフィルター適用後: ${result.length}件`);
+        console.log('グループフィルター適用後の営業担当者:', result.map(rep => rep.name));
+      }
     }
     
     setFilteredReps(result);
-  }, [nameFilter, departmentFilter, salesReps, viewMode, currentUserData]);
+  }, [nameFilter, departmentFilter, groupFilter, salesReps, viewMode, currentUserData, salesRepGroups]);
 
   // フィルターをリセットする
   const resetFilters = () => {
     setNameFilter('');
     setDepartmentFilter('');
+    setGroupFilter('');
   };
 
   // 営業担当者の詳細ページへのリンク
@@ -236,6 +299,27 @@ export default function SalesRepsPage() {
                 ))}
               </select>
             </div>
+            
+            {departmentFilter === FIRST_DEPARTMENT_ID && (
+              <div className="flex-1 min-w-[200px]">
+                <label htmlFor="groupFilter" className="block text-sm font-medium mb-1">
+                  グループで絞り込み
+                </label>
+                <select
+                  id="groupFilter"
+                  value={groupFilter}
+                  onChange={(e) => setGroupFilter(e.target.value)}
+                  className="w-full rounded-md border p-2 text-sm"
+                >
+                  <option value="">すべてのグループ</option>
+                  {departmentGroups.map(group => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             
             <div className="flex items-end">
               <button

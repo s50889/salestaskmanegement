@@ -4,14 +4,26 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import MainLayout from '@/components/layouts/MainLayout';
 import { getUser, updatePassword } from '@/lib/supabase/client';
-import { getSalesRepByUserId, updateSalesRep, getDepartments } from '@/lib/supabase/api';
-import { SalesRep, Department } from '@/types';
+import { 
+  getSalesRepByUserId, 
+  updateSalesRep, 
+  getDepartments, 
+  getDepartmentGroups,
+  getSalesRepGroup,
+  assignSalesRepToGroup,
+  removeSalesRepFromGroup
+} from '@/lib/supabase/api';
+import { SalesRep, Department, DepartmentGroup, SalesRepGroup } from '@/types';
 
 export default function ProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentGroups, setDepartmentGroups] = useState<DepartmentGroup[]>([]);
+  const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('none');
+  const [loadingGroups, setLoadingGroups] = useState(false);
   const [profileData, setProfileData] = useState<{
     id: string;
     name: string;
@@ -59,6 +71,23 @@ export default function ProfilePage() {
             email: salesRep.email,
             department_id: salesRep.department_id,
           });
+          
+          // 営業担当者の所属グループを取得
+          if (salesRep.department_id) {
+            // 部署のグループ一覧を取得
+            const groupsData = await getDepartmentGroups(salesRep.department_id);
+            setDepartmentGroups(groupsData);
+            
+            // 現在のグループ割り当てを取得
+            const salesRepGroup = await getSalesRepGroup(salesRep.id);
+            if (salesRepGroup) {
+              setCurrentGroupId(salesRepGroup.department_group_id);
+              setSelectedGroupId(salesRepGroup.department_group_id);
+            } else {
+              setCurrentGroupId(null);
+              setSelectedGroupId('none');
+            }
+          }
         } else {
           setError('プロフィール情報の取得に失敗しました');
         }
@@ -72,6 +101,80 @@ export default function ProfilePage() {
 
     fetchUserProfile();
   }, [router]);
+  
+  // 部署変更時にグループ一覧を更新
+  useEffect(() => {
+    async function fetchDepartmentGroups() {
+      if (!profileData.department_id) {
+        setDepartmentGroups([]);
+        setCurrentGroupId(null);
+        setSelectedGroupId('none');
+        return;
+      }
+      
+      try {
+        setLoadingGroups(true);
+        // 部署のグループ一覧を取得
+        const groupsData = await getDepartmentGroups(profileData.department_id);
+        setDepartmentGroups(groupsData);
+        
+        // 現在のグループ割り当てを取得
+        const salesRepGroup = await getSalesRepGroup(profileData.id);
+        if (salesRepGroup) {
+          // 現在の部署のグループかどうかを確認
+          const groupExists = groupsData.some(g => g.id === salesRepGroup.department_group_id);
+          if (groupExists) {
+            setCurrentGroupId(salesRepGroup.department_group_id);
+            setSelectedGroupId(salesRepGroup.department_group_id);
+          } else {
+            // 部署が変わった場合、グループ割り当ては解除
+            setCurrentGroupId(null);
+            setSelectedGroupId('none');
+          }
+        } else {
+          setCurrentGroupId(null);
+          setSelectedGroupId('none');
+        }
+      } catch (err) {
+        console.error('グループデータ取得エラー:', err);
+      } finally {
+        setLoadingGroups(false);
+      }
+    }
+    
+    fetchDepartmentGroups();
+  }, [profileData.department_id, profileData.id]);
+  
+  // グループ割り当て処理
+  const handleGroupAssignment = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      let result;
+      
+      if (selectedGroupId === 'none') {
+        // グループから削除（無所属にする）
+        result = await removeSalesRepFromGroup(profileData.id);
+      } else {
+        // グループに割り当て
+        result = await assignSalesRepToGroup(profileData.id, selectedGroupId);
+      }
+      
+      if (result) {
+        setSuccess('プロフィールとグループ割り当てを更新しました');
+        setCurrentGroupId(selectedGroupId === 'none' ? null : selectedGroupId);
+      } else {
+        setError('グループ割り当ての更新に失敗しました');
+      }
+    } catch (err) {
+      console.error('グループ割り当てエラー:', err);
+      setError('グループ割り当て処理中にエラーが発生しました');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -241,7 +344,41 @@ export default function ProfilePage() {
                 ))}
               </select>
             </div>
-
+            
+            {profileData.department_id && profileData.department_id === 'cc22f892-b2e1-425d-8472-385bacbc9da8' && departmentGroups.length > 0 && (
+              <div>
+                <label htmlFor="group_id" className="block text-sm font-medium mb-1">
+                  グループ
+                </label>
+                <select
+                  id="group_id"
+                  value={selectedGroupId}
+                  onChange={(e) => setSelectedGroupId(e.target.value)}
+                  className="w-full rounded-md border p-2"
+                  disabled={loadingGroups}
+                >
+                  <option value="none">無所属</option>
+                  {departmentGroups.map(group => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+                {currentGroupId !== selectedGroupId && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      className="rounded-md bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+                      onClick={handleGroupAssignment}
+                      disabled={saving || loadingGroups}
+                    >
+                      {saving ? 'グループ更新中...' : 'グループを更新'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            
             <div className="pt-4">
               <button
                 type="submit"

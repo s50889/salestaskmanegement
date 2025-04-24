@@ -9,10 +9,11 @@ type DealFormProps = {
   deal?: Deal;
   customers: Customer[];
   salesReps: SalesRep[];
+  currentSalesRep?: SalesRep | null;
   onSuccess?: () => void;
 };
 
-export default function DealForm({ deal, customers, salesReps, onSuccess }: DealFormProps) {
+export default function DealForm({ deal, customers, salesReps, currentSalesRep, onSuccess }: DealFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +32,7 @@ export default function DealForm({ deal, customers, salesReps, onSuccess }: Deal
     status: 'negotiation' as Deal['status'],
     description: '',
     sales_rep_id: '',
+    expected_close_date: null as string | null,
   });
 
   // 金額のフォーマット関数
@@ -48,16 +50,17 @@ export default function DealForm({ deal, customers, salesReps, onSuccess }: Deal
       setFormData({
         name: deal.name,
         customer_id: deal.customer_id,
-        amount: deal.amount,
-        gross_profit: deal.gross_profit || 0,
+        amount: Number(deal.amount),
+        gross_profit: Number(deal.gross_profit || 0),
         status: deal.status,
         description: deal.description,
         sales_rep_id: deal.sales_rep_id,
+        expected_close_date: deal.expected_close_date,
       });
       
       // 金額を表示用にフォーマット
-      setDisplayAmount(formatAmountForDisplay(deal.amount));
-      setDisplayGrossProfit(formatAmountForDisplay(deal.gross_profit || 0));
+      setDisplayAmount(formatAmountForDisplay(Number(deal.amount)));
+      setDisplayGrossProfit(formatAmountForDisplay(Number(deal.gross_profit || 0)));
       
       // 選択されている顧客を設定
       const customer = customers.find(c => c.id === deal.customer_id);
@@ -65,8 +68,14 @@ export default function DealForm({ deal, customers, salesReps, onSuccess }: Deal
         setSelectedCustomer(customer);
         setCustomerSearchTerm(customer.name);
       }
+    } else if (currentSalesRep) {
+      // 新規作成モードで、ログインユーザーの営業担当者情報がある場合
+      setFormData(prev => ({
+        ...prev,
+        sales_rep_id: currentSalesRep.id
+      }));
     }
-  }, [deal, customers]);
+  }, [deal, customers, currentSalesRep]);
 
   // 顧客検索ドロップダウンの外側をクリックした時に閉じる
   useEffect(() => {
@@ -95,6 +104,8 @@ export default function DealForm({ deal, customers, salesReps, onSuccess }: Deal
     } else if (name === 'status') {
       // statusフィールドの型をDeal['status']に変換
       setFormData(prev => ({ ...prev, [name]: value as Deal['status'] }));
+    } else if (name === 'expected_close_date') {
+      setFormData(prev => ({ ...prev, [name]: value as string | null }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -303,25 +314,59 @@ export default function DealForm({ deal, customers, salesReps, onSuccess }: Deal
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="sales_rep_id" className="text-sm font-medium">
-            担当者 <span className="text-destructive">*</span>
+          <label htmlFor="expected_close_date" className="text-sm font-medium">
+            予想決着日
           </label>
-          <select
-            id="sales_rep_id"
-            name="sales_rep_id"
-            value={formData.sales_rep_id}
+          <input
+            id="expected_close_date"
+            name="expected_close_date"
+            type="date"
+            value={formData.expected_close_date ?? ''}
             onChange={handleChange}
-            required
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          >
-            <option value="">選択してください</option>
-            {salesReps.map(rep => (
-              <option key={rep.id} value={rep.id}>
-                {rep.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
+
+        {!currentSalesRep ? (
+          <div className="space-y-2">
+            <label htmlFor="sales_rep_id" className="text-sm font-medium">
+              担当者 <span className="text-destructive">*</span>
+            </label>
+            <select
+              id="sales_rep_id"
+              name="sales_rep_id"
+              value={formData.sales_rep_id}
+              onChange={handleChange}
+              required
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              <option value="">選択してください</option>
+              {salesReps.map(rep => (
+                <option key={rep.id} value={rep.id}>
+                  {rep.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label htmlFor="sales_rep_name" className="text-sm font-medium">
+              担当者
+            </label>
+            <input
+              id="sales_rep_name"
+              type="text"
+              value={currentSalesRep.name}
+              readOnly
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 bg-gray-50"
+            />
+            <input
+              type="hidden"
+              name="sales_rep_id"
+              value={formData.sales_rep_id}
+            />
+          </div>
+        )}
       </div>
 
       <div className="space-y-2 md:col-span-2">

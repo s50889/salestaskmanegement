@@ -4,13 +4,16 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import MainLayout from '@/components/layouts/MainLayout';
 import { getUser } from '@/lib/supabase/client';
-import { getSalesReps, getSalesRepPerformance, getDepartments } from '@/lib/supabase/api';
-import { SalesRepPerformance, Department } from '@/types';
+import { getSalesReps, getSalesRepPerformance, getDepartments, getDepartmentGroups, getSalesRepGroup } from '@/lib/supabase/api';
+import { SalesRepPerformance, Department, DepartmentGroup } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // グラフの色設定
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#d0ed57', '#a4de6c', '#FF6B6B', '#C9CBA3', '#87BFFF', '#FFE156', '#DC8686', '#46CDCF', '#6B7AA1', '#725AC1', '#727D71'];
+
+// 第一営業部のID
+const FIRST_DEPARTMENT_ID = 'cc22f892-b2e1-425d-8472-385bacbc9da8';
 
 type ChartData = {
   name: string;
@@ -21,6 +24,11 @@ type ChartData = {
   受注件数: number;
   商談中件数: number;
 };
+
+// グループID情報を含む拡張された営業担当者パフォーマンス型
+interface SalesRepPerformanceWithGroup extends SalesRepPerformance {
+  groupId: string | null;
+}
 
 type CompareMetric = '受注' | '商談中';
 
@@ -33,6 +41,9 @@ export default function PerformancePage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [compareMetric, setCompareMetric] = useState<CompareMetric>('受注');
+  const [departmentGroups, setDepartmentGroups] = useState<DepartmentGroup[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<string>('all');
+  const [salesRepGroups, setSalesRepGroups] = useState<SalesRepPerformanceWithGroup[]>([]);
 
   useEffect(() => {
     async function fetchData() {
@@ -51,6 +62,10 @@ export default function PerformancePage() {
         // 部署一覧を取得
         const departmentsData = await getDepartments();
         setDepartments(departmentsData);
+        
+        // 部署グループ一覧を取得
+        const departmentGroupsData = await getDepartmentGroups();
+        setDepartmentGroups(departmentGroupsData);
         
         // 現在のユーザーが管理者かどうかを確認
         const currentRep = reps.find(rep => rep.user_id === user.id);
@@ -87,13 +102,61 @@ export default function PerformancePage() {
     fetchData();
   }, [router, compareMetric]);
 
-  // 部署でフィルタリングされたデータを取得
-  const getFilteredSalesReps = () => {
-    if (selectedDepartment === 'all') {
-      return salesReps;
+  // 営業担当者のグループデータを取得
+  useEffect(() => {
+    async function fetchGroupData() {
+      try {
+        if (selectedDepartment === FIRST_DEPARTMENT_ID) {
+          // 第一営業部のグループ一覧を取得
+          const groupsData = await getDepartmentGroups(FIRST_DEPARTMENT_ID);
+          setDepartmentGroups(groupsData);
+          
+          // 営業担当者のグループ割り当て情報を取得
+          const repsWithGroups = await Promise.all(
+            salesReps
+              .filter(rep => rep.department_id === FIRST_DEPARTMENT_ID)
+              .map(async (rep) => {
+                const groupInfo = await getSalesRepGroup(rep.salesRepId);
+                return {
+                  ...rep,
+                  groupId: groupInfo ? groupInfo.department_group_id : null
+                };
+              })
+          );
+          
+          setSalesRepGroups(repsWithGroups);
+        } else {
+          setDepartmentGroups([]);
+          setSelectedGroup('all');
+        }
+      } catch (error) {
+        console.error('グループデータ取得エラー:', error);
+      }
     }
     
-    return salesReps.filter(rep => rep.department_id === selectedDepartment);
+    fetchGroupData();
+  }, [selectedDepartment, salesReps]);
+
+  // 部署でフィルタリングされたデータを取得
+  const getFilteredSalesReps = () => {
+    let filteredReps = salesReps;
+    
+    // 部署フィルター
+    if (selectedDepartment !== 'all') {
+      filteredReps = filteredReps.filter(rep => rep.department_id === selectedDepartment);
+    }
+    
+    // 第一営業部かつグループフィルターが選択されている場合
+    if (selectedDepartment === FIRST_DEPARTMENT_ID && selectedGroup !== 'all') {
+      // 営業担当者とグループの紐付け情報を使用してフィルタリング
+      const repIdsInGroup = salesRepGroups
+        .filter(rep => rep.groupId === selectedGroup)
+        .map(rep => rep.salesRepId);
+      
+      filteredReps = filteredReps.filter(rep => repIdsInGroup.includes(rep.salesRepId));
+    }
+    
+    return filteredReps;
   };
 
   // グラフ用のデータを準備
@@ -225,6 +288,24 @@ export default function PerformancePage() {
               ))}
             </select>
           </div>
+          
+          {selectedDepartment === FIRST_DEPARTMENT_ID && (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">部署グループ選択</label>
+              <select
+                value={selectedGroup}
+                onChange={(e) => setSelectedGroup(e.target.value)}
+                className="px-3 py-1.5 border rounded-md bg-background text-sm"
+              >
+                <option value="all">全ての部署グループ</option>
+                {departmentGroups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         
         {getFilteredSalesReps().length === 0 ? (
@@ -233,6 +314,46 @@ export default function PerformancePage() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* 担当者一覧テーブル */}
+            <div className="rounded-lg border bg-card p-6 shadow-sm">
+              <h2 className="text-xl font-semibold mb-4">パフォーマンスデータ一覧</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="px-4 py-2 text-center border bg-purple-100" rowSpan={2}>順位</th>
+                      <th className="px-4 py-2 text-left border" rowSpan={2}>担当者名</th>
+                      <th className="px-4 py-2 text-center border bg-blue-100" colSpan={2}>受注</th>
+                      <th className="px-4 py-2 text-center border bg-green-100" colSpan={2}>商談中</th>
+                      <th className="px-4 py-2 text-center border bg-amber-100" colSpan={2}>件数</th>
+                    </tr>
+                    <tr className="bg-muted/30">
+                      <th className="px-4 py-2 text-right border bg-blue-50">金額</th>
+                      <th className="px-4 py-2 text-right border bg-blue-50">粗利</th>
+                      <th className="px-4 py-2 text-right border bg-green-50">金額</th>
+                      <th className="px-4 py-2 text-right border bg-green-50">粗利</th>
+                      <th className="px-4 py-2 text-right border bg-amber-50">受注</th>
+                      <th className="px-4 py-2 text-right border bg-amber-50">商談中</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chartData.map((rep, index) => (
+                      <tr key={index} className={index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
+                        <td className="px-4 py-2 text-center border bg-purple-50/50 font-bold">{index + 1}</td>
+                        <td className="px-4 py-2 border font-medium">{rep.name}</td>
+                        <td className="px-4 py-2 text-right border bg-blue-50/50">{formatCurrency(rep.受注金額)}</td>
+                        <td className="px-4 py-2 text-right border bg-blue-50/50">{formatCurrency(rep.受注粗利)}</td>
+                        <td className="px-4 py-2 text-right border bg-green-50/50">{formatCurrency(rep.商談中金額)}</td>
+                        <td className="px-4 py-2 text-right border bg-green-50/50">{formatCurrency(rep.商談中粗利)}</td>
+                        <td className="px-4 py-2 text-right border bg-amber-50/50">{rep.受注件数}</td>
+                        <td className="px-4 py-2 text-right border bg-amber-50/50">{rep.商談中件数}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
             <div className="rounded-lg border bg-card p-6 shadow-sm">
               <h2 className="text-xl font-semibold mb-4">
                 {selectedDepartment !== 'all' ? 
@@ -263,44 +384,6 @@ export default function PerformancePage() {
                     <Bar dataKey={粗利} fill="#82ca9d" name={粗利} barSize={20} />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
-            </div>
-            
-            {/* 担当者一覧テーブル */}
-            <div className="rounded-lg border bg-card p-6 shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">パフォーマンスデータ一覧</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-muted/50">
-                      <th className="px-4 py-2 text-left border" rowSpan={2}>担当者名</th>
-                      <th className="px-4 py-2 text-center border bg-blue-100" colSpan={2}>受注</th>
-                      <th className="px-4 py-2 text-center border bg-green-100" colSpan={2}>商談中</th>
-                      <th className="px-4 py-2 text-center border bg-amber-100" colSpan={2}>件数</th>
-                    </tr>
-                    <tr className="bg-muted/30">
-                      <th className="px-4 py-2 text-right border bg-blue-50">金額</th>
-                      <th className="px-4 py-2 text-right border bg-blue-50">粗利</th>
-                      <th className="px-4 py-2 text-right border bg-green-50">金額</th>
-                      <th className="px-4 py-2 text-right border bg-green-50">粗利</th>
-                      <th className="px-4 py-2 text-right border bg-amber-50">受注</th>
-                      <th className="px-4 py-2 text-right border bg-amber-50">商談中</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {chartData.map((rep, index) => (
-                      <tr key={index} className={index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
-                        <td className="px-4 py-2 border font-medium">{rep.name}</td>
-                        <td className="px-4 py-2 text-right border bg-blue-50/50">{formatCurrency(rep.受注金額)}</td>
-                        <td className="px-4 py-2 text-right border bg-blue-50/50">{formatCurrency(rep.受注粗利)}</td>
-                        <td className="px-4 py-2 text-right border bg-green-50/50">{formatCurrency(rep.商談中金額)}</td>
-                        <td className="px-4 py-2 text-right border bg-green-50/50">{formatCurrency(rep.商談中粗利)}</td>
-                        <td className="px-4 py-2 text-right border bg-amber-50/50">{rep.受注件数}</td>
-                        <td className="px-4 py-2 text-right border bg-amber-50/50">{rep.商談中件数}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             </div>
           </div>

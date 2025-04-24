@@ -110,3 +110,27 @@ export type DepartmentPerformance = {
   inProgressProfit: number;
   activities: number;
 };
+
+// 部署グループの型
+export type DepartmentGroup = {
+  id: string;
+  department_id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 営業担当者とグループの関連付けの型
+export type SalesRepGroup = {
+  id: string;
+  sales_rep_id: string;
+  department_group_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// グループ情報を含む営業担当者の型
+export type SalesRepWithGroup = SalesRep & {
+  group?: DepartmentGroup;
+}

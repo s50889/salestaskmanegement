@@ -1,5 +1,5 @@
 import { supabase } from './client';
-import { Customer, Deal, Activity, SalesRep, SalesRepPerformance, Department, DepartmentPerformance } from '@/types';
+import { Customer, Deal, Activity, SalesRep, SalesRepPerformance, Department, DepartmentPerformance, DepartmentGroup, SalesRepGroup, SalesRepWithGroup } from '@/types';
 
 // 顧客関連の関数
 export const getCustomers = async (getAllForAdmin = false): Promise<Customer[]> => {
@@ -1166,6 +1166,204 @@ export const getSalesRepsByDepartment = async (departmentId: string): Promise<Sa
   } catch (error) {
     console.error('部署別営業担当者データ取得エラー:', error);
     return [];
+  }
+};
+
+// 部署グループ関連の関数
+// 部署グループ一覧を取得
+export const getDepartmentGroups = async (departmentId?: string): Promise<DepartmentGroup[]> => {
+  try {
+    let query = supabase
+      .from('department_groups')
+      .select('*')
+      .order('name');
+    
+    if (departmentId) {
+      query = query.eq('department_id', departmentId);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('部署グループデータの取得に失敗しました:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('部署グループデータ取得エラー:', error);
+    return [];
+  }
+};
+
+// 特定のグループを取得
+export const getDepartmentGroupById = async (id: string): Promise<DepartmentGroup | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('department_groups')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error(`グループIDが ${id} のデータ取得に失敗しました:`, error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error(`グループIDが ${id} のデータ取得エラー:`, error);
+    return null;
+  }
+};
+
+// 営業担当者のグループ割り当てを取得
+export const getSalesRepGroup = async (salesRepId: string): Promise<SalesRepGroup | null> => {
+  try {
+    // .single()を使わず、通常のクエリとして実行
+    const { data, error } = await supabase
+      .from('sales_rep_groups')
+      .select('*')
+      .eq('sales_rep_id', salesRepId);
+    
+    if (error) {
+      console.error(`営業担当者IDが ${salesRepId} のグループ割り当て取得に失敗しました:`, error);
+      return null;
+    }
+    
+    // データが存在しない場合は null を返す
+    if (!data || data.length === 0) {
+      return null;
+    }
+    
+    // 最初の結果を返す（通常は1つしかないはず）
+    return data[0];
+  } catch (error) {
+    console.error(`営業担当者IDが ${salesRepId} のグループ割り当て取得エラー:`, error);
+    return null;
+  }
+};
+
+// グループ情報を含む営業担当者を取得
+export const getSalesRepWithGroup = async (salesRepId: string): Promise<SalesRepWithGroup | null> => {
+  try {
+    // まず営業担当者の情報を取得
+    const salesRep = await getSalesRepById(salesRepId);
+    if (!salesRep) return null;
+    
+    // 営業担当者のグループ割り当てを取得
+    const salesRepGroup = await getSalesRepGroup(salesRepId);
+    if (!salesRepGroup) {
+      // グループ割り当てがない場合は営業担当者情報のみ返す
+      return salesRep as SalesRepWithGroup;
+    }
+    
+    // グループ情報を取得
+    const group = await getDepartmentGroupById(salesRepGroup.department_group_id);
+    
+    // 営業担当者情報とグループ情報を結合
+    return {
+      ...salesRep,
+      group: group || undefined
+    };
+  } catch (error) {
+    console.error(`営業担当者IDが ${salesRepId} のグループ情報取得エラー:`, error);
+    return null;
+  }
+};
+
+// 特定の部署に所属する営業担当者をグループ情報付きで取得
+export const getSalesRepsByDepartmentWithGroup = async (departmentId: string): Promise<SalesRepWithGroup[]> => {
+  try {
+    // 部署に所属する営業担当者を取得
+    const salesReps = await getSalesRepsByDepartment(departmentId);
+    
+    // 各営業担当者のグループ情報を取得
+    const salesRepsWithGroup = await Promise.all(
+      salesReps.map(async (rep) => {
+        const salesRepGroup = await getSalesRepGroup(rep.id);
+        if (!salesRepGroup) {
+          return { ...rep, group: undefined };
+        }
+        
+        const group = await getDepartmentGroupById(salesRepGroup.department_group_id);
+        return {
+          ...rep,
+          group: group || undefined
+        };
+      })
+    );
+    
+    return salesRepsWithGroup;
+  } catch (error) {
+    console.error(`部署IDが ${departmentId} の営業担当者グループ情報取得エラー:`, error);
+    return [];
+  }
+};
+
+// 営業担当者のグループを割り当て/更新
+export const assignSalesRepToGroup = async (salesRepId: string, groupId: string): Promise<boolean> => {
+  try {
+    // 既存の割り当てを確認
+    const existingAssignment = await getSalesRepGroup(salesRepId);
+    
+    if (existingAssignment) {
+      // 既存の割り当てがある場合は更新
+      const { error } = await supabase
+        .from('sales_rep_groups')
+        .update({ 
+          department_group_id: groupId, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', existingAssignment.id);
+      
+      if (error) {
+        console.error(`営業担当者IDが ${salesRepId} のグループ割り当て更新に失敗しました:`, error);
+        console.error('エラー詳細:', error);
+        return false;
+      }
+    } else {
+      // 新規割り当て
+      const { error } = await supabase
+        .from('sales_rep_groups')
+        .insert({ 
+          sales_rep_id: salesRepId, 
+          department_group_id: groupId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) {
+        console.error(`営業担当者IDが ${salesRepId} のグループ割り当てに失敗しました:`, error);
+        console.error('エラー詳細:', error);
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`営業担当者IDが ${salesRepId} のグループ割り当てエラー:`, error);
+    return false;
+  }
+};
+
+// 営業担当者のグループ割り当てを削除（無所属にする）
+export const removeSalesRepFromGroup = async (salesRepId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('sales_rep_groups')
+      .delete()
+      .eq('sales_rep_id', salesRepId);
+    
+    if (error) {
+      console.error(`営業担当者IDが ${salesRepId} のグループ割り当て削除に失敗しました:`, error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`営業担当者IDが ${salesRepId} のグループ割り当て削除エラー:`, error);
+    return false;
   }
 };
 
