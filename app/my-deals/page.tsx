@@ -20,6 +20,10 @@ export default function MyDealsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentSalesRepId, setCurrentSalesRepId] = useState<string | null>(null);
+  
+  // ページネーション用の状態
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12; // 1ページあたり12件表示
 
   // ステータスの日本語表示マッピング
   const statusMapping: Record<string, { text: string, bgColor: string, textColor: string }> = {
@@ -100,6 +104,17 @@ export default function MyDealsPage() {
     return matchesSearch && matchesStatus;
   });
 
+  // ページネーション
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const paginatedDeals = filteredDeals.slice(indexOfFirstItem, indexOfLastItem);
+
+  // ページネーションのページ数を計算
+  const pageNumbers = [];
+  for (let i = 1; i <= Math.ceil(filteredDeals.length / itemsPerPage); i++) {
+    pageNumbers.push(i);
+  }
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -145,7 +160,7 @@ export default function MyDealsPage() {
           <div className="rounded-lg border bg-card p-6 shadow-sm">
             <p className="text-muted-foreground">データを読み込み中...</p>
           </div>
-        ) : filteredDeals.length === 0 ? (
+        ) : paginatedDeals.length === 0 ? (
           <div className="rounded-lg border bg-card p-6 shadow-sm">
             <p className="text-muted-foreground">表示する案件がありません</p>
           </div>
@@ -164,7 +179,7 @@ export default function MyDealsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredDeals.map((deal) => {
+                  {paginatedDeals.map((deal) => {
                     const status = statusMapping[deal.status] || { text: '不明', bgColor: 'bg-gray-100', textColor: 'text-gray-800' };
                     
                     return (
@@ -203,6 +218,57 @@ export default function MyDealsPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+        
+        {/* ページネーション */}
+        {filteredDeals.length > 0 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              全 {filteredDeals.length} 件中 {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredDeals.length)} 件を表示
+            </p>
+            <div className="flex gap-1">
+              {/* 前のページへ */}
+              <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-1.5 rounded-md text-sm ${
+                  currentPage === 1 
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                前へ
+              </button>
+              
+              {/* ページ番号 */}
+              {pageNumbers.map(number => (
+                <button 
+                  key={number} 
+                  onClick={() => setCurrentPage(number)}
+                  className={`px-3 py-1.5 rounded-md text-sm ${
+                    currentPage === number 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted hover:bg-muted/80 text-foreground'
+                  }`}
+                >
+                  {number}
+                </button>
+              ))}
+              
+              {/* 次のページへ */}
+              <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, pageNumbers.length))}
+                disabled={currentPage === pageNumbers.length}
+                className={`px-3 py-1.5 rounded-md text-sm ${
+                  currentPage === pageNumbers.length 
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                次へ
+              </button>
             </div>
           </div>
         )}

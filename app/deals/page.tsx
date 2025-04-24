@@ -19,6 +19,10 @@ export default function DealsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [salesRepFilter, setSalesRepFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
+  
+  // ページネーション用の状態
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12; // 1ページあたり12件表示
 
   // ステータスの日本語表示マッピング
   const statusMapping: Record<string, { text: string, bgColor: string, textColor: string }> = {
@@ -118,6 +122,17 @@ export default function DealsPage() {
     );
   }
 
+  // ページネーション
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const paginatedDeals = filteredDeals.slice(indexOfFirstItem, indexOfLastItem);
+
+  // ページネーションのページ数を計算
+  const pageNumbers = [];
+  for (let i = 1; i <= Math.ceil(filteredDeals.length / itemsPerPage); i++) {
+    pageNumbers.push(i);
+  }
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -196,8 +211,8 @@ export default function DealsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredDeals.length > 0 ? (
-                  filteredDeals.map(deal => (
+                {paginatedDeals.length > 0 ? (
+                  paginatedDeals.map(deal => (
                     <tr key={deal.id} className="border-b">
                       <td className="px-4 py-3 text-sm">{deal.name}</td>
                       <td className="px-4 py-3 text-sm">{getCustomerName(deal)}</td>
@@ -240,13 +255,54 @@ export default function DealsPage() {
           </div>
         </div>
         
-        {/* ページネーション（実装は省略） */}
+        {/* ページネーション */}
         {filteredDeals.length > 0 && (
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              全 {filteredDeals.length} 件を表示
+              全 {filteredDeals.length} 件中 {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredDeals.length)} 件を表示
             </p>
-            {/* ページネーションは将来的に実装 */}
+            <div className="flex gap-1">
+              {/* 前のページへ */}
+              <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-1.5 rounded-md text-sm ${
+                  currentPage === 1 
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                前へ
+              </button>
+              
+              {/* ページ番号 */}
+              {pageNumbers.map(number => (
+                <button 
+                  key={number} 
+                  onClick={() => setCurrentPage(number)}
+                  className={`px-3 py-1.5 rounded-md text-sm ${
+                    currentPage === number 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted hover:bg-muted/80 text-foreground'
+                  }`}
+                >
+                  {number}
+                </button>
+              ))}
+              
+              {/* 次のページへ */}
+              <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, pageNumbers.length))}
+                disabled={currentPage === pageNumbers.length}
+                className={`px-3 py-1.5 rounded-md text-sm ${
+                  currentPage === pageNumbers.length 
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                次へ
+              </button>
+            </div>
           </div>
         )}
       </div>

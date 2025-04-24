@@ -83,14 +83,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </Link>
           
           <Link 
-            href="/deals" 
-            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/deals')}`}
-          >
-            <span className="mr-2">💼</span>
-            案件管理
-          </Link>
-          
-          <Link 
             href="/my-deals" 
             className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/my-deals')}`}
           >
@@ -128,6 +120,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
           >
             <span className="mr-2">📈</span>
             営業成績一覧
+          </Link>
+          
+          <Link 
+            href="/deals" 
+            className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${isActive('/deals')}`}
+          >
+            <span className="mr-2">💼</span>
+            案件一覧
           </Link>
           
           <Link 
