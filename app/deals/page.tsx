@@ -16,7 +16,8 @@ export default function DealsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [salesRepFilter, setSalesRepFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   
@@ -80,18 +81,25 @@ export default function DealsPage() {
   // フィルタリングされた案件リストを取得
   const filteredDeals = deals.filter(deal => {
     const customerName = deal.customer?.name || '';
+    const salesRepName = getSalesRepName(deal);
+    
     const matchesSearch = 
       searchTerm === '' || 
       deal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customerName.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === '' || deal.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || deal.status === statusFilter;
+    
+    // 種別フィルタリング
+    const matchesCategory = categoryFilter === 'all' || deal.category === categoryFilter;
+    
     const matchesSalesRep = salesRepFilter === '' || deal.sales_rep_id === salesRepFilter;
     
     // 部署フィルター: 部署が選択されている場合は、その部署に所属する営業担当者の案件のみを表示
-    const matchesDepartment = departmentFilter === '' || (deal.sales_rep?.department_id === departmentFilter);
+    const matchesDepartment = departmentFilter === '' || 
+      (salesReps.find(rep => rep.id === deal.sales_rep_id)?.department_id === departmentFilter);
     
-    return matchesSearch && matchesStatus && matchesSalesRep && matchesDepartment;
+    return matchesSearch && matchesStatus && matchesCategory && matchesSalesRep && matchesDepartment;
   });
 
   // 案件追加ページへ移動
@@ -163,13 +171,22 @@ export default function DealsPage() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="">ステータス: すべて</option>
+              <option value="all">ステータス: すべて</option>
               <option value="negotiation">商談中</option>
               <option value="proposal">提案中</option>
               <option value="quotation">見積提出</option>
               <option value="final_negotiation">最終交渉</option>
               <option value="won">受注</option>
               <option value="lost">失注</option>
+            </select>
+            <select 
+              className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              <option value="all">種別: すべて</option>
+              <option value="機械工具">機械工具</option>
+              <option value="工事">工事</option>
             </select>
             <select 
               className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
@@ -201,13 +218,12 @@ export default function DealsPage() {
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="px-4 py-3 text-left text-sm font-medium">案件名</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">顧客名</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">金額</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">粗利</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">ステータス</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">顧客</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">担当者</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">更新日</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">操作</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">ステータス</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium">金額</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium">種別</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -216,15 +232,14 @@ export default function DealsPage() {
                     <tr key={deal.id} className="border-b">
                       <td className="px-4 py-3 text-sm">{deal.name}</td>
                       <td className="px-4 py-3 text-sm">{getCustomerName(deal)}</td>
-                      <td className="px-4 py-3 text-sm">{formatCurrency(Number(deal.amount))}</td>
-                      <td className="px-4 py-3 text-sm">{formatCurrency(Number(deal.gross_profit || 0))}</td>
+                      <td className="px-4 py-3 text-sm">{getSalesRepName(deal)}</td>
                       <td className="px-4 py-3 text-sm">
                         <span className={`rounded-full ${statusMapping[deal.status]?.bgColor || 'bg-gray-100'} px-2 py-1 text-xs font-medium ${statusMapping[deal.status]?.textColor || 'text-gray-800'}`}>
                           {statusMapping[deal.status]?.text || deal.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm">{getSalesRepName(deal)}</td>
-                      <td className="px-4 py-3 text-sm">{formatDate(deal.updated_at)}</td>
+                      <td className="px-4 py-3 text-sm text-right">{formatCurrency(Number(deal.amount))}</td>
+                      <td className="px-4 py-3 text-sm text-center">{deal.category}</td>
                       <td className="px-4 py-3 text-sm">
                         <div className="flex gap-2">
                           <button 
@@ -245,7 +260,7 @@ export default function DealsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    <td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">
                       案件データがありません
                     </td>
                   </tr>

@@ -17,7 +17,8 @@ export default function MyDealsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentSalesRepId, setCurrentSalesRepId] = useState<string | null>(null);
   
@@ -89,19 +90,23 @@ export default function MyDealsPage() {
   // 現在のユーザーの案件のみをフィルタリング
   const filteredDeals = deals.filter(deal => {
     // 現在のユーザーの案件のみを表示
-    if (!currentSalesRepId || deal.sales_rep_id !== currentSalesRepId) {
-      return false;
-    }
+    const isMySalesRep = currentSalesRepId && deal.sales_rep_id === currentSalesRepId;
+    if (!isMySalesRep) return false;
     
+    // 検索条件とステータスフィルターを適用
     const customerName = deal.customer?.name || '';
+    
     const matchesSearch = 
       searchTerm === '' || 
       deal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customerName.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === '' || deal.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || deal.status === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    // 種別フィルタリング
+    const matchesCategory = categoryFilter === 'all' || deal.category === categoryFilter;
+    
+    return matchesSearch && matchesStatus && matchesCategory;
   });
 
   // ページネーション
@@ -148,10 +153,23 @@ export default function MyDealsPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-1.5 border rounded-md bg-background text-sm"
             >
-              <option value="">すべて</option>
+              <option value="all">すべて</option>
               {Object.entries(statusMapping).map(([key, { text }]) => (
                 <option key={key} value={key}>{text}</option>
               ))}
+            </select>
+          </div>
+          
+          <div className="space-y-1">
+            <label className="text-sm font-medium">種別</label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-3 py-1.5 border rounded-md bg-background text-sm"
+            >
+              <option value="all">すべて</option>
+              <option value="機械工具">機械工具</option>
+              <option value="工事">工事</option>
             </select>
           </div>
         </div>
@@ -174,7 +192,8 @@ export default function MyDealsPage() {
                     <th className="px-4 py-3 text-left text-sm font-medium">顧客</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">ステータス</th>
                     <th className="px-4 py-3 text-right text-sm font-medium">金額</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">更新日</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">粗利</th>
+                    <th className="px-4 py-3 text-center text-sm font-medium">種別</th>
                     <th className="px-4 py-3 text-center text-sm font-medium">操作</th>
                   </tr>
                 </thead>
@@ -196,7 +215,8 @@ export default function MyDealsPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-right">{formatCurrency(Number(deal.amount))}</td>
-                        <td className="px-4 py-3 text-sm text-right">{formatDate(deal.updated_at)}</td>
+                        <td className="px-4 py-3 text-sm text-right">{formatCurrency(Number(deal.gross_profit))}</td>
+                        <td className="px-4 py-3 text-sm text-center">{deal.category}</td>
                         <td className="px-4 py-3 text-sm text-center">
                           <div className="flex justify-center space-x-2">
                             <Link 

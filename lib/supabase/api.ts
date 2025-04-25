@@ -623,7 +623,7 @@ export const getSalesRepPerformance = async (salesRepId?: string): Promise<Sales
       // 案件データの取得
       const { data: dealsData, error: dealsError } = await supabase
         .from('deals')
-        .select('id, status, amount, gross_profit')
+        .select('id, status, amount, gross_profit, category')
         .eq('sales_rep_id', salesRepId);
       
       if (dealsError) {
@@ -632,6 +632,10 @@ export const getSalesRepPerformance = async (salesRepId?: string): Promise<Sales
       }
       
       console.log('取得した案件データ:', dealsData);
+      // 案件のカテゴリーデータを確認
+      dealsData.forEach(deal => {
+        console.log(`案件ID: ${deal.id}, ステータス: ${deal.status}, カテゴリー: ${deal.category}`);
+      });
       
       // 活動データの取得
       const { data: activitiesData, error: activitiesError } = await supabase
@@ -668,6 +672,93 @@ export const getSalesRepPerformance = async (salesRepId?: string): Promise<Sales
       
       const activities = activitiesData.length;
       
+      // カテゴリ別の実績
+      const machineryWonDeals = dealsData.filter(deal => {
+        // 機械工具カテゴリーかつ受注済みの案件のみ
+        return (deal.status === 'won' && (
+                deal.category === '機械工具' || 
+                deal.category?.toLowerCase().includes('機械') || 
+                deal.category?.toLowerCase().includes('工具')));
+      }).length;
+      
+      const machineryWonAmount = dealsData.filter(deal => {
+        return (deal.status === 'won' && (
+                deal.category === '機械工具' || 
+                deal.category?.toLowerCase().includes('機械') || 
+                deal.category?.toLowerCase().includes('工具')));
+      }).reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
+      
+      const machineryProfit = dealsData.filter(deal => {
+        return (deal.status === 'won' && (
+                deal.category === '機械工具' || 
+                deal.category?.toLowerCase().includes('機械') || 
+                deal.category?.toLowerCase().includes('工具')));
+      }).reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
+      
+      const constructionWonDeals = dealsData.filter(deal => {
+        // 工事カテゴリーかつ受注済みの案件のみ
+        return (deal.status === 'won' && (
+                deal.category === '工事' || 
+                deal.category?.toLowerCase().includes('工事') ||
+                deal.category?.toLowerCase().includes('construction')));
+      }).length;
+      
+      const constructionWonAmount = dealsData.filter(deal => {
+        return (deal.status === 'won' && (
+                deal.category === '工事' || 
+                deal.category?.toLowerCase().includes('工事') ||
+                deal.category?.toLowerCase().includes('construction')));
+      }).reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
+      
+      const constructionProfit = dealsData.filter(deal => {
+        return (deal.status === 'won' && (
+                deal.category === '工事' || 
+                deal.category?.toLowerCase().includes('工事') ||
+                deal.category?.toLowerCase().includes('construction')));
+      }).reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
+      
+      const machineryInProgressDeals = dealsData.filter(deal => {
+        return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+               deal.category === '機械工具' || 
+               deal.category?.toLowerCase().includes('機械') || 
+               deal.category?.toLowerCase().includes('工具')));
+      }).length;
+      
+      const machineryInProgressAmount = dealsData.filter(deal => {
+        return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+               deal.category === '機械工具' || 
+               deal.category?.toLowerCase().includes('機械') || 
+               deal.category?.toLowerCase().includes('工具')));
+      }).reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
+      
+      const constructionInProgressDeals = dealsData.filter(deal => {
+        return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+               deal.category === '工事' || 
+               deal.category?.toLowerCase().includes('工事') ||
+               deal.category?.toLowerCase().includes('construction')));
+      }).length;
+      
+      const constructionInProgressAmount = dealsData.filter(deal => {
+        return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+               deal.category === '工事' || 
+               deal.category?.toLowerCase().includes('工事') ||
+               deal.category?.toLowerCase().includes('construction')));
+      }).reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
+      
+      const machineryInProgressProfit = dealsData.filter(deal => {
+        return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+               deal.category === '機械工具' || 
+               deal.category?.toLowerCase().includes('機械') || 
+               deal.category?.toLowerCase().includes('工具')));
+      }).reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
+      
+      const constructionInProgressProfit = dealsData.filter(deal => {
+        return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+               deal.category === '工事' || 
+               deal.category?.toLowerCase().includes('工事') ||
+               deal.category?.toLowerCase().includes('construction')));
+      }).reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
+      
       return {
         salesRepId: repData.id,
         name: repData.name,
@@ -682,7 +773,19 @@ export const getSalesRepPerformance = async (salesRepId?: string): Promise<Sales
         inProgressAmount,
         totalProfit,
         inProgressProfit,
-        activities
+        activities,
+        machineryWonDeals,
+        machineryWonAmount,
+        machineryProfit,
+        constructionWonDeals,
+        constructionWonAmount,
+        constructionProfit,
+        machineryInProgressDeals,
+        machineryInProgressAmount,
+        constructionInProgressDeals,
+        constructionInProgressAmount,
+        machineryInProgressProfit,
+        constructionInProgressProfit
       };
     } 
     // 全営業担当者のデータを取得する場合
@@ -703,7 +806,7 @@ export const getSalesRepPerformance = async (salesRepId?: string): Promise<Sales
           // 案件データの取得
           const { data: dealsData, error: dealsError } = await supabase
             .from('deals')
-            .select('id, status, amount, gross_profit')
+            .select('id, status, amount, gross_profit, category')
             .eq('sales_rep_id', rep.id);
           
           if (dealsError) {
@@ -746,6 +849,93 @@ export const getSalesRepPerformance = async (salesRepId?: string): Promise<Sales
           
           const activities = activitiesData.length;
           
+          // カテゴリ別の実績
+          const machineryWonDeals = dealsData.filter(deal => {
+            // 機械工具カテゴリーかつ受注済みの案件のみ
+            return (deal.status === 'won' && (
+                    deal.category === '機械工具' || 
+                    deal.category?.toLowerCase().includes('機械') || 
+                    deal.category?.toLowerCase().includes('工具')));
+          }).length;
+          
+          const machineryWonAmount = dealsData.filter(deal => {
+            return (deal.status === 'won' && (
+                    deal.category === '機械工具' || 
+                    deal.category?.toLowerCase().includes('機械') || 
+                    deal.category?.toLowerCase().includes('工具')));
+          }).reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
+          
+          const machineryProfit = dealsData.filter(deal => {
+            return (deal.status === 'won' && (
+                    deal.category === '機械工具' || 
+                    deal.category?.toLowerCase().includes('機械') || 
+                    deal.category?.toLowerCase().includes('工具')));
+          }).reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
+          
+          const constructionWonDeals = dealsData.filter(deal => {
+            // 工事カテゴリーかつ受注済みの案件のみ
+            return (deal.status === 'won' && (
+                    deal.category === '工事' || 
+                    deal.category?.toLowerCase().includes('工事') ||
+                    deal.category?.toLowerCase().includes('construction')));
+          }).length;
+          
+          const constructionWonAmount = dealsData.filter(deal => {
+            return (deal.status === 'won' && (
+                    deal.category === '工事' || 
+                    deal.category?.toLowerCase().includes('工事') ||
+                    deal.category?.toLowerCase().includes('construction')));
+          }).reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
+          
+          const constructionProfit = dealsData.filter(deal => {
+            return (deal.status === 'won' && (
+                    deal.category === '工事' || 
+                    deal.category?.toLowerCase().includes('工事') ||
+                    deal.category?.toLowerCase().includes('construction')));
+          }).reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
+          
+          const machineryInProgressDeals = dealsData.filter(deal => {
+            return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                   deal.category === '機械工具' || 
+                   deal.category?.toLowerCase().includes('機械') || 
+                   deal.category?.toLowerCase().includes('工具')));
+          }).length;
+          
+          const machineryInProgressAmount = dealsData.filter(deal => {
+            return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                   deal.category === '機械工具' || 
+                   deal.category?.toLowerCase().includes('機械') || 
+                   deal.category?.toLowerCase().includes('工具')));
+          }).reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
+          
+          const constructionInProgressDeals = dealsData.filter(deal => {
+            return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                   deal.category === '工事' || 
+                   deal.category?.toLowerCase().includes('工事') ||
+                   deal.category?.toLowerCase().includes('construction')));
+          }).length;
+          
+          const constructionInProgressAmount = dealsData.filter(deal => {
+            return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                   deal.category === '工事' || 
+                   deal.category?.toLowerCase().includes('工事') ||
+                   deal.category?.toLowerCase().includes('construction')));
+          }).reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
+          
+          const machineryInProgressProfit = dealsData.filter(deal => {
+            return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                   deal.category === '機械工具' || 
+                   deal.category?.toLowerCase().includes('機械') || 
+                   deal.category?.toLowerCase().includes('工具')));
+          }).reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
+          
+          const constructionInProgressProfit = dealsData.filter(deal => {
+            return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                   deal.category === '工事' || 
+                   deal.category?.toLowerCase().includes('工事') ||
+                   deal.category?.toLowerCase().includes('construction')));
+          }).reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
+          
           return {
             salesRepId: rep.id,
             name: rep.name,
@@ -760,7 +950,19 @@ export const getSalesRepPerformance = async (salesRepId?: string): Promise<Sales
             inProgressAmount,
             totalProfit,
             inProgressProfit,
-            activities
+            activities,
+            machineryWonDeals,
+            machineryWonAmount,
+            machineryProfit,
+            constructionWonDeals,
+            constructionWonAmount,
+            constructionProfit,
+            machineryInProgressDeals,
+            machineryInProgressAmount,
+            constructionInProgressDeals,
+            constructionInProgressAmount,
+            machineryInProgressProfit,
+            constructionInProgressProfit
           };
         })
       );
@@ -806,7 +1008,7 @@ export const getDashboardStats = async (salesRepId?: string, departmentId?: stri
   
   try {
     // 案件のステータス別集計のクエリを構築
-    let query = supabase.from('deals').select('status, amount');
+    let query = supabase.from('deals').select('status, amount, category');
     
     // 営業担当者でフィルター
     if (salesRepId) {
@@ -847,7 +1049,7 @@ export const getDashboardStats = async (salesRepId?: string, departmentId?: stri
     // 案件の総額集計
     const { data: dealAmountData } = await supabase
       .from('deals')
-      .select('status, amount');
+      .select('status, amount, category');
     
     // ステータス別に金額を集計
     if (dealAmountData) {
@@ -896,18 +1098,30 @@ export const getDashboardStats = async (salesRepId?: string, departmentId?: stri
 };
 
 // 案件金額の統計情報を取得
-export const getDealAmountStats = async (salesRepId?: string, departmentId?: string) => {
+export const getDealAmountStats = async (salesRepId?: string, departmentId?: string): Promise<{
+  inProgress: { 
+    total: number; 
+    profitTotal: number; 
+    count: number; 
+    machinery: number; 
+    construction: number;
+    machineryProfit: number;
+    constructionProfit: number;
+  };
+  won: { total: number; profitTotal: number; count: number };
+  monthlyData: { month: string; amount: number; profit: number; count: number }[];
+}> => {
   console.log(`getDealAmountStats 呼び出し: salesRepId=${salesRepId}, departmentId=${departmentId}`);
   
   // 進行中の案件用のデータ
-  let inProgressDeals: { amount: number; gross_profit: number }[] = [];
+  let inProgressDeals: { amount: number; gross_profit: number; category: string }[] = [];
   
   // 進行中の案件の合計金額と粗利を取得
   try {
     // クエリを構築
     let query = supabase
       .from('deals')
-      .select('amount, gross_profit')
+      .select('amount, gross_profit, category')
       .neq('status', 'won')
       .neq('status', 'lost');
     
@@ -933,7 +1147,7 @@ export const getDealAmountStats = async (salesRepId?: string, departmentId?: str
         inProgressDeals = [];
         // 早期リターン
         return {
-          inProgress: { total: 0, profitTotal: 0, count: 0 },
+          inProgress: { total: 0, profitTotal: 0, count: 0, machinery: 0, construction: 0, machineryProfit: 0, constructionProfit: 0 },
           won: { total: 0, profitTotal: 0, count: 0 },
           monthlyData: []
         };
@@ -951,14 +1165,14 @@ export const getDealAmountStats = async (salesRepId?: string, departmentId?: str
   }
   
   // 受注済み案件用のデータ
-  let wonDeals: { amount: number; gross_profit: number; updated_at: string | null }[] = [];
+  let wonDeals: { amount: number; gross_profit: number; updated_at: string | null; category: string }[] = [];
   
   // 受注済み案件の合計金額と粗利を取得
   try {
     // クエリを構築
     let query = supabase
       .from('deals')
-      .select('amount, gross_profit, updated_at')
+      .select('amount, gross_profit, updated_at, category')
       .eq('status', 'won');
       
     // 営業担当者でフィルター
@@ -1035,6 +1249,26 @@ export const getDealAmountStats = async (salesRepId?: string, departmentId?: str
   // 進行中の案件の合計を計算
   const inProgressTotal = inProgressDeals.reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
   const inProgressProfitTotal = inProgressDeals.reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
+  const inProgressMachinery = inProgressDeals.filter(deal => {
+    return (deal.category === '機械工具' || 
+            deal.category?.toLowerCase().includes('機械') || 
+            deal.category?.toLowerCase().includes('工具'));
+  }).reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
+  const inProgressConstruction = inProgressDeals.filter(deal => {
+    return (deal.category === '工事' || 
+            deal.category?.toLowerCase().includes('工事') ||
+            deal.category?.toLowerCase().includes('construction'));
+  }).reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
+  const inProgressMachineryProfit = inProgressDeals.filter(deal => {
+    return (deal.category === '機械工具' || 
+            deal.category?.toLowerCase().includes('機械') || 
+            deal.category?.toLowerCase().includes('工具'));
+  }).reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
+  const inProgressConstructionProfit = inProgressDeals.filter(deal => {
+    return (deal.category === '工事' || 
+            deal.category?.toLowerCase().includes('工事') ||
+            deal.category?.toLowerCase().includes('construction'));
+  }).reduce((sum, deal) => sum + (Number(deal.gross_profit) || 0), 0);
   
   // 受注済み案件の合計を計算
   const wonTotal = wonDeals.reduce((sum, deal) => sum + (Number(deal.amount) || 0), 0);
@@ -1044,7 +1278,11 @@ export const getDealAmountStats = async (salesRepId?: string, departmentId?: str
     inProgress: {
       total: inProgressTotal,
       profitTotal: inProgressProfitTotal,
-      count: inProgressDeals.length
+      count: inProgressDeals.length,
+      machinery: inProgressMachinery,
+      construction: inProgressConstruction,
+      machineryProfit: inProgressMachineryProfit,
+      constructionProfit: inProgressConstructionProfit
     },
     won: {
       total: wonTotal,
@@ -1413,7 +1651,7 @@ export const getDepartmentPerformance = async (): Promise<DepartmentPerformance[
         // 部署の案件データを取得
         const { data: deals, error: dealError } = await supabase
           .from('deals')
-          .select('id, status, amount, gross_profit')
+          .select('id, status, amount, gross_profit, category')
           .in('sales_rep_id', salesRepIds);
         
         // 部署の活動データを取得
@@ -1455,6 +1693,90 @@ export const getDepartmentPerformance = async (): Promise<DepartmentPerformance[
           .filter(deal => deal.status === 'negotiation' || deal.status === 'quotation')
           .reduce((sum, deal) => sum + Number(deal.gross_profit || 0), 0);
         
+        const machineryWonDeals = dealsData.filter(deal => {
+          return (deal.status === 'won' && (
+                  deal.category === '機械工具' || 
+                  deal.category?.toLowerCase().includes('機械') || 
+                  deal.category?.toLowerCase().includes('工具')));
+        }).length;
+        
+        const machineryWonAmount = dealsData.filter(deal => {
+          return (deal.status === 'won' && (
+                  deal.category === '機械工具' || 
+                  deal.category?.toLowerCase().includes('機械') || 
+                  deal.category?.toLowerCase().includes('工具')));
+        }).reduce((sum, deal) => sum + Number(deal.amount), 0);
+        
+        const machineryProfit = dealsData.filter(deal => {
+          return (deal.status === 'won' && (
+                  deal.category === '機械工具' || 
+                  deal.category?.toLowerCase().includes('機械') || 
+                  deal.category?.toLowerCase().includes('工具')));
+        }).reduce((sum, deal) => sum + Number(deal.gross_profit || 0), 0);
+        
+        const constructionWonDeals = dealsData.filter(deal => {
+          return (deal.status === 'won' && (
+                  deal.category === '工事' || 
+                  deal.category?.toLowerCase().includes('工事') ||
+                  deal.category?.toLowerCase().includes('construction')));
+        }).length;
+        
+        const constructionWonAmount = dealsData.filter(deal => {
+          return (deal.status === 'won' && (
+                  deal.category === '工事' || 
+                  deal.category?.toLowerCase().includes('工事') ||
+                  deal.category?.toLowerCase().includes('construction')));
+        }).reduce((sum, deal) => sum + Number(deal.amount), 0);
+        
+        const constructionProfit = dealsData.filter(deal => {
+          return (deal.status === 'won' && (
+                  deal.category === '工事' || 
+                  deal.category?.toLowerCase().includes('工事') ||
+                  deal.category?.toLowerCase().includes('construction')));
+        }).reduce((sum, deal) => sum + Number(deal.gross_profit || 0), 0);
+        
+        const machineryInProgressDeals = dealsData.filter(deal => {
+          return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                 deal.category === '機械工具' || 
+                 deal.category?.toLowerCase().includes('機械') || 
+                 deal.category?.toLowerCase().includes('工具')));
+        }).length;
+        
+        const machineryInProgressAmount = dealsData.filter(deal => {
+          return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                 deal.category === '機械工具' || 
+                 deal.category?.toLowerCase().includes('機械') || 
+                 deal.category?.toLowerCase().includes('工具')));
+        }).reduce((sum, deal) => sum + Number(deal.amount), 0);
+        
+        const constructionInProgressDeals = dealsData.filter(deal => {
+          return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                 deal.category === '工事' || 
+                 deal.category?.toLowerCase().includes('工事') ||
+                 deal.category?.toLowerCase().includes('construction')));
+        }).length;
+        
+        const constructionInProgressAmount = dealsData.filter(deal => {
+          return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                 deal.category === '工事' || 
+                 deal.category?.toLowerCase().includes('工事') ||
+                 deal.category?.toLowerCase().includes('construction')));
+        }).reduce((sum, deal) => sum + Number(deal.amount), 0);
+        
+        const machineryInProgressProfit = dealsData.filter(deal => {
+          return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                 deal.category === '機械工具' || 
+                 deal.category?.toLowerCase().includes('機械') || 
+                 deal.category?.toLowerCase().includes('工具')));
+        }).reduce((sum, deal) => sum + Number(deal.gross_profit || 0), 0);
+        
+        const constructionInProgressProfit = dealsData.filter(deal => {
+          return ((deal.status === 'negotiation' || deal.status === 'quotation') && (
+                 deal.category === '工事' || 
+                 deal.category?.toLowerCase().includes('工事') ||
+                 deal.category?.toLowerCase().includes('construction')));
+        }).reduce((sum, deal) => sum + Number(deal.gross_profit || 0), 0);
+        
         return {
           departmentId: dept.id,
           name: dept.name,
@@ -1467,7 +1789,19 @@ export const getDepartmentPerformance = async (): Promise<DepartmentPerformance[
           inProgressAmount,
           totalProfit,
           inProgressProfit,
-          activities: activitiesData.length
+          activities: activitiesData.length,
+          machineryWonDeals,
+          machineryWonAmount,
+          machineryProfit,
+          constructionWonDeals,
+          constructionWonAmount,
+          constructionProfit,
+          machineryInProgressDeals,
+          machineryInProgressAmount,
+          constructionInProgressDeals,
+          constructionInProgressAmount,
+          machineryInProgressProfit,
+          constructionInProgressProfit
         };
       })
     );

@@ -22,14 +22,19 @@ export type Deal = {
   id: string;
   name: string;
   customer_id: string;
-  amount: string | number;
-  status: 'won' | 'lost' | 'negotiation' | 'quotation';
+  status: 'negotiation' | 'proposal' | 'quotation' | 'won' | 'lost';
+  amount: number;
+  gross_profit: number;
   description: string;
   sales_rep_id: string;
   expected_close_date: string | null;
+  // 古いフィールド（廃止予定）
+  is_machinery?: boolean;
+  is_construction?: boolean;
+  // 新しいフィールド
+  category: string;
   created_at: string;
   updated_at: string;
-  gross_profit: string | number;
   customer?: Customer;
   sales_rep?: SalesRep;
 }
@@ -93,6 +98,22 @@ export type SalesRepPerformance = {
   totalProfit: number;
   inProgressProfit: number;
   activities: number;
+  // 工事関連の実績
+  constructionWonDeals?: number;
+  constructionWonAmount?: number;
+  constructionProfit?: number;
+  // 機械工具関連の実績
+  machineryWonDeals?: number;
+  machineryWonAmount?: number;
+  machineryProfit?: number;
+  // 商談中の工事関連の実績
+  constructionInProgressDeals?: number;
+  constructionInProgressAmount?: number;
+  constructionInProgressProfit?: number;
+  // 商談中の機械工具関連の実績
+  machineryInProgressDeals?: number;
+  machineryInProgressAmount?: number;
+  machineryInProgressProfit?: number;
 };
 
 // 部署のパフォーマンスデータの型

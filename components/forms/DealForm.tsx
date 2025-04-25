@@ -32,7 +32,7 @@ export default function DealForm({ deal, customers, salesReps, currentSalesRep, 
     status: 'negotiation' as Deal['status'],
     description: '',
     sales_rep_id: '',
-    expected_close_date: null as string | null,
+    category: 'なし',
   });
 
   // 金額のフォーマット関数
@@ -55,7 +55,7 @@ export default function DealForm({ deal, customers, salesReps, currentSalesRep, 
         status: deal.status,
         description: deal.description,
         sales_rep_id: deal.sales_rep_id,
-        expected_close_date: deal.expected_close_date,
+        category: deal.category || 'なし',
       });
       
       // 金額を表示用にフォーマット
@@ -96,16 +96,28 @@ export default function DealForm({ deal, customers, salesReps, currentSalesRep, 
     customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase())
   );
 
+  // 入力変更のハンドラー
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
     if (name === 'amount') {
-      // 何もしない（金額は別のハンドラで処理）
+      // カンマを除去して数値に変換
+      const numericValue = value.replace(/,/g, '');
+      if (!isNaN(Number(numericValue))) {
+        setFormData(prev => ({ ...prev, [name]: Number(numericValue) }));
+        setDisplayAmount(formatAmountForDisplay(Number(numericValue)));
+      }
+    } else if (name === 'gross_profit') {
+      // カンマを除去して数値に変換
+      const numericValue = value.replace(/,/g, '');
+      if (!isNaN(Number(numericValue))) {
+        setFormData(prev => ({ ...prev, [name]: Number(numericValue) }));
+        setDisplayGrossProfit(formatAmountForDisplay(Number(numericValue)));
+      }
     } else if (name === 'status') {
-      // statusフィールドの型をDeal['status']に変換
       setFormData(prev => ({ ...prev, [name]: value as Deal['status'] }));
-    } else if (name === 'expected_close_date') {
-      setFormData(prev => ({ ...prev, [name]: value as string | null }));
+    } else if (name === 'category') {
+      setFormData(prev => ({ ...prev, [name]: value }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -166,12 +178,25 @@ export default function DealForm({ deal, customers, salesReps, currentSalesRep, 
     setError(null);
 
     try {
+      // 送信データに予想決着日をnullとして追加
+      const submitData = {
+        name: formData.name,
+        customer_id: formData.customer_id,
+        amount: formData.amount,
+        gross_profit: formData.gross_profit,
+        status: formData.status,
+        description: formData.description,
+        sales_rep_id: formData.sales_rep_id,
+        category: formData.category,
+        expected_close_date: null
+      };
+      
       if (deal) {
         // 既存案件の更新
-        await updateDeal(deal.id, formData);
+        await updateDeal(deal.id, submitData);
       } else {
         // 新規案件の作成
-        await createDeal(formData);
+        await createDeal(submitData);
       }
 
       // 成功時の処理
@@ -314,17 +339,20 @@ export default function DealForm({ deal, customers, salesReps, currentSalesRep, 
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="expected_close_date" className="text-sm font-medium">
-            予想決着日
+          <label htmlFor="category" className="text-sm font-medium">
+            カテゴリー
           </label>
-          <input
-            id="expected_close_date"
-            name="expected_close_date"
-            type="date"
-            value={formData.expected_close_date ?? ''}
+          <select
+            id="category"
+            name="category"
+            value={formData.category}
             onChange={handleChange}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
+          >
+            <option value="なし">なし</option>
+            <option value="機械工具">機械工具</option>
+            <option value="工事">工事</option>
+          </select>
         </div>
 
         {!currentSalesRep ? (
