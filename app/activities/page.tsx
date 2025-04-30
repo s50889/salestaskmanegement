@@ -19,6 +19,10 @@ export default function ActivitiesPage() {
   const [currentUserID, setCurrentUserID] = useState<string | null>(null);
   const [viewAllActivities, setViewAllActivities] = useState(false);
   const [salesRepFilter, setSalesRepFilter] = useState('');
+  
+  // ページング用の状態
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   // 活動種別の日本語表示マッピング
   const activityTypeMapping: Record<string, { text: string, bgColor: string, textColor: string }> = {
@@ -70,6 +74,7 @@ export default function ActivitiesPage() {
   const toggleViewAllActivities = async () => {
     setLoading(true);
     setViewAllActivities(!viewAllActivities);
+    setCurrentPage(1); // ページをリセット
   };
 
   // フィルタリングされた活動リストを取得
@@ -90,6 +95,51 @@ export default function ActivitiesPage() {
     
     return matchesSearch && matchesActivityType && matchesSalesRep;
   });
+  
+  // ページング処理
+  const totalPages = Math.ceil(filteredActivities.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredActivities.slice(indexOfFirstItem, indexOfLastItem);
+  
+  // ページ変更ハンドラー
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+  
+  // 前のページに移動
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+  
+  // 次のページに移動
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+  
+  // ページネーションの表示範囲を計算
+  const getPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5; // 表示するページ番号の最大数
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
+    
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i);
+    }
+    
+    return pageNumbers;
+  };
 
   // 活動記録ページへ移動
   const handleAddActivity = () => {
@@ -112,6 +162,11 @@ export default function ActivitiesPage() {
       router.push(`/deals/${dealId}`);
     }
   };
+  
+  // 検索やフィルターが変更されたらページをリセット
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activityTypeFilter, salesRepFilter]);
 
   if (loading) {
     return (
@@ -213,8 +268,8 @@ export default function ActivitiesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredActivities.length > 0 ? (
-                  filteredActivities.map((activity) => (
+                {currentItems.length > 0 ? (
+                  currentItems.map((activity) => (
                     <tr key={activity.id} className="border-b hover:bg-muted/30">
                       <td className="px-4 py-3 text-sm">{formatDate(activity.date || activity.created_at)}</td>
                       <td className="px-4 py-3 text-sm font-medium">{activity.customers?.name || '不明'}</td>
@@ -272,6 +327,53 @@ export default function ActivitiesPage() {
             </table>
           </div>
         </div>
+        
+        {/* ページネーション */}
+        {filteredActivities.length > 0 && (
+          <div className="flex justify-center mt-6">
+            <div className="flex items-center space-x-2">
+              {/* 前へボタン */}
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded-md border bg-white text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                前へ
+              </button>
+              
+              {/* ページ番号 */}
+              {getPageNumbers().map(number => (
+                <button
+                  key={number}
+                  onClick={() => handlePageChange(number)}
+                  className={`px-3 py-1 rounded-md text-sm font-medium ${
+                    currentPage === number
+                      ? 'bg-primary text-primary-foreground'
+                      : 'border bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  {number}
+                </button>
+              ))}
+              
+              {/* 次へボタン */}
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded-md border bg-white text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                次へ
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* 表示件数情報 */}
+        {filteredActivities.length > 0 && (
+          <div className="text-sm text-center text-gray-500">
+            全{filteredActivities.length}件中 {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredActivities.length)}件を表示
+          </div>
+        )}
       </div>
     </MainLayout>
   );

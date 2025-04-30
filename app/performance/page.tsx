@@ -599,35 +599,41 @@ export default function PerformancePage() {
           
           <div className="space-y-1">
             <label className="text-sm font-medium">部署選択</label>
-            <select
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="px-3 py-1.5 border rounded-md bg-background text-sm"
-            >
-              <option value="all">全ての部署</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
+            {/* mt-6クラスを追加して位置を調整 */}
+            <div className="mt-2">
+              <select
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                className="px-3 py-1.5 border rounded-md bg-background text-sm"
+              >
+                <option value="all">全ての部署</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           
           {selectedDepartment === FIRST_DEPARTMENT_ID && (
             <div className="space-y-1">
               <label className="text-sm font-medium">部署グループ選択</label>
-              <select
-                value={selectedGroup}
-                onChange={(e) => setSelectedGroup(e.target.value)}
-                className="px-3 py-1.5 border rounded-md bg-background text-sm"
-              >
-                <option value="all">全ての部署グループ</option>
-                {departmentGroups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
+              {/* mt-6クラスを追加して位置を調整 */}
+              <div className="mt-2">
+                <select
+                  value={selectedGroup}
+                  onChange={(e) => setSelectedGroup(e.target.value)}
+                  className="px-3 py-1.5 border rounded-md bg-background text-sm"
+                >
+                  <option value="all">全ての部署グループ</option>
+                  {departmentGroups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
         </div>

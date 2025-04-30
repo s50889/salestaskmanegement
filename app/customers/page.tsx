@@ -19,6 +19,11 @@ function CustomersList() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [viewAllCustomers, setViewAllCustomers] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // ページング用の状態
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   useEffect(() => {
     async function fetchData() {
@@ -55,6 +60,7 @@ function CustomersList() {
   const toggleViewAllCustomers = async () => {
     setLoading(true);
     setViewAllCustomers(!viewAllCustomers);
+    setCurrentPage(1); // ページをリセット
   };
 
   // 営業担当者IDから名前を取得する関数
@@ -123,6 +129,63 @@ function CustomersList() {
       setUpdateLoading(false);
     }
   };
+  
+  // 検索フィルタリング
+  const filteredCustomers = customers.filter(customer => 
+    searchTerm === '' || 
+    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (customer.company && customer.company.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+  
+  // ページング処理
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredCustomers.slice(indexOfFirstItem, indexOfLastItem);
+  
+  // ページ変更ハンドラー
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+  
+  // 前のページに移動
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+  
+  // 次のページに移動
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+  
+  // ページネーションの表示範囲を計算
+  const getPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5; // 表示するページ番号の最大数
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
+    
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i);
+    }
+    
+    return pageNumbers;
+  };
+  
+  // 検索語が変更されたらページをリセット
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   if (loading) {
     return (
@@ -158,9 +221,20 @@ function CustomersList() {
         </div>
       )}
       
-      {customers.length === 0 ? (
+      {/* 検索フィルター */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="会社名で検索..."
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+      
+      {filteredCustomers.length === 0 ? (
         <div className="rounded-md bg-muted p-8 text-center">
-          <p className="text-muted-foreground">登録されている顧客はありません</p>
+          <p className="text-muted-foreground">条件に一致する顧客はありません</p>
           <Link
             href="/customers/new"
             className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
@@ -180,7 +254,7 @@ function CustomersList() {
                 </tr>
               </thead>
               <tbody>
-                {customers.map((customer) => (
+                {currentItems.map((customer) => (
                   <tr key={customer.id} className="border-b">
                     {editingId === customer.id ? (
                       // 編集モード
@@ -251,6 +325,53 @@ function CustomersList() {
           </div>
         </div>
       )}
+      
+      {/* ページネーション */}
+      {filteredCustomers.length > 0 && (
+        <div className="flex justify-center mt-6">
+          <div className="flex items-center space-x-2">
+            {/* 前へボタン */}
+            <button
+              onClick={goToPreviousPage}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded-md border bg-white text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              前へ
+            </button>
+            
+            {/* ページ番号 */}
+            {getPageNumbers().map(number => (
+              <button
+                key={number}
+                onClick={() => handlePageChange(number)}
+                className={`px-3 py-1 rounded-md text-sm font-medium ${
+                  currentPage === number
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border bg-white hover:bg-gray-50'
+                }`}
+              >
+                {number}
+              </button>
+            ))}
+            
+            {/* 次へボタン */}
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded-md border bg-white text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              次へ
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* 表示件数情報 */}
+      {filteredCustomers.length > 0 && (
+        <div className="text-sm text-center text-gray-500 mt-2">
+          全{filteredCustomers.length}件中 {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredCustomers.length)}件を表示
+        </div>
+      )}
     </>
   );
 }
@@ -268,17 +389,6 @@ export default function CustomersPage() {
           >
             新規顧客追加
           </Link>
-        </div>
-        
-        {/* 検索フィルター */}
-        <div className="flex flex-col gap-4 md:flex-row">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="会社名で検索..."
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            />
-          </div>
         </div>
         
         {/* 顧客一覧 */}
