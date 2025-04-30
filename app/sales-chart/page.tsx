@@ -121,11 +121,45 @@ export default function SalesChartPage() {
   // チャートデータの準備
   const prepareChartData = () => {
     const filteredReps = getFilteredSalesReps();
-    // 上位10人に制限
-    return filteredReps.slice(0, 10).map(rep => ({
+    // 上位10人に制限し、ソート
+    const sortedReps = [...filteredReps].sort((a, b) => {
+      const valueA = getMetricValue(a, metricType, categoryType);
+      const valueB = getMetricValue(b, metricType, categoryType);
+      return valueB - valueA; // 降順ソート
+    }).slice(0, 10);
+    
+    return sortedReps.map((rep, index) => ({
       name: rep.name,
-      value: getMetricValue(rep, metricType, categoryType)
+      value: getMetricValue(rep, metricType, categoryType),
+      rank: index + 1 // ランキング情報を追加
     }));
+  };
+
+  // ランキングマークを取得する関数
+  const getRankMark = (rank: number) => {
+    switch(rank) {
+      case 1: return '🏆';
+      case 2: return '🥈';
+      case 3: return '🥉';
+      default: return '';
+    }
+  };
+
+  // カスタムYAxisTickコンポーネント
+  const CustomYAxisTick = (props: any) => {
+    const { x, y, payload } = props;
+    const entry = chartData.find(item => item.name === payload.value);
+    const rank = entry?.rank || 0;
+    const mark = getRankMark(rank);
+    
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text x={-5} y={0} dy={4} textAnchor="end" fill="#666">
+          {mark && <tspan style={{ marginRight: '4px' }}>{mark}</tspan>}
+          <tspan>{payload.value}</tspan>
+        </text>
+      </g>
+    );
   };
 
   // カスタムツールチップの実装
@@ -268,18 +302,27 @@ export default function SalesChartPage() {
           
           <div className="space-y-1">
             <label className="text-sm font-medium">部署選択</label>
-            <select
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="px-3 py-1.5 border rounded-md bg-background text-sm"
-            >
-              <option value="all">全ての部署</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
+            {/* ドロップダウンの位置調整: mt-6の数値を変更することで上下の位置を調整できます
+               mt-2: 少し下げる
+               mt-4: 中程度に下げる
+               mt-6: さらに下げる
+               mt-8: かなり下げる
+               mt-0: 通常位置に戻す
+            */}
+            <div className="mt-0">
+              <select
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                className="px-3 py-1.5 border rounded-md bg-background text-sm"
+              >
+                <option value="all">全ての部署</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
         
@@ -310,8 +353,8 @@ export default function SalesChartPage() {
                       <YAxis 
                         dataKey="name" 
                         type="category" 
-                        tick={{ fontSize: 12 }}
-                        width={100}
+                        tick={<CustomYAxisTick />}
+                        width={120}
                       />
                       <Tooltip formatter={(value: number) => formatCurrency(value) + '円'} />
                       <Legend />
@@ -320,7 +363,17 @@ export default function SalesChartPage() {
                         name={metricType} 
                         fill={COLORS[0]}
                         radius={[0, 4, 4, 0]}
-                      />
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={index === 0 ? '#FFD700' : // 1位は金色
+                                  index === 1 ? '#C0C0C0' : // 2位は銀色
+                                  index === 2 ? '#CD7F32' : // 3位は銅色
+                                  COLORS[0]} 
+                          />
+                        ))}
+                      </Bar>
                     </BarChart>
                   )}
                   
