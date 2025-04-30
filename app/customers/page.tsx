@@ -8,7 +8,7 @@ import { Customer, SalesRep } from '@/types';
 import { getUser } from '@/lib/supabase/client';
 
 // 顧客一覧を表示するコンポーネント
-function CustomersList() {
+function CustomersList({ searchTerm }: { searchTerm: string }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,6 +19,10 @@ function CustomersList() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [viewAllCustomers, setViewAllCustomers] = useState(false);
+
+  // ページネーション用の状態
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12; // 1ページあたり12件表示
 
   useEffect(() => {
     async function fetchData() {
@@ -124,6 +128,23 @@ function CustomersList() {
     }
   };
 
+  // 検索フィルターを適用した顧客リスト
+  const filteredCustomers = customers.filter(customer => {
+    return !searchTerm || 
+      (customer.name && customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  });
+
+  // ページネーション用のデータ
+  const pageNumbers = [];
+  for (let i = 1; i <= Math.ceil(filteredCustomers.length / itemsPerPage); i++) {
+    pageNumbers.push(i);
+  }
+
+  // 現在のページに表示する顧客リスト
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentCustomers = filteredCustomers.slice(indexOfFirstItem, indexOfLastItem);
+
   if (loading) {
     return (
       <div className="rounded-lg border p-4 text-center">
@@ -180,7 +201,7 @@ function CustomersList() {
                 </tr>
               </thead>
               <tbody>
-                {customers.map((customer) => (
+                {currentCustomers.map((customer) => (
                   <tr key={customer.id} className="border-b">
                     {editingId === customer.id ? (
                       // 編集モード
@@ -251,12 +272,62 @@ function CustomersList() {
           </div>
         </div>
       )}
+      
+      {/* ページネーション */}
+      {filteredCustomers.length > 0 && (
+        <div className="flex justify-center mt-6">
+          <div className="flex gap-1">
+            {/* 前のページへ */}
+            <button 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-1.5 rounded-md text-sm ${
+                currentPage === 1 
+                  ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                  : 'bg-muted hover:bg-muted/80 text-foreground'
+              }`}
+            >
+              前へ
+            </button>
+            
+            {/* ページ番号 */}
+            {pageNumbers.map(number => (
+              <button 
+                key={number} 
+                onClick={() => setCurrentPage(number)}
+                className={`px-3 py-1.5 rounded-md text-sm ${
+                  currentPage === number 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                {number}
+              </button>
+            ))}
+            
+            {/* 次のページへ */}
+            <button 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, pageNumbers.length))}
+              disabled={currentPage === pageNumbers.length || pageNumbers.length === 0}
+              className={`px-3 py-1.5 rounded-md text-sm ${
+                currentPage === pageNumbers.length || pageNumbers.length === 0
+                  ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                  : 'bg-muted hover:bg-muted/80 text-foreground'
+              }`}
+            >
+              次へ
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
 // 顧客管理ページ本体
 export default function CustomersPage() {
+  const [searchTerm, setSearchTerm] = useState('');
+  
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -276,13 +347,15 @@ export default function CustomersPage() {
             <input
               type="text"
               placeholder="会社名で検索..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
             />
           </div>
         </div>
         
         {/* 顧客一覧 */}
-        <CustomersList />
+        <CustomersList searchTerm={searchTerm} />
       </div>
     </MainLayout>
   );

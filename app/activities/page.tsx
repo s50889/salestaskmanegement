@@ -20,6 +20,10 @@ export default function ActivitiesPage() {
   const [viewAllActivities, setViewAllActivities] = useState(false);
   const [salesRepFilter, setSalesRepFilter] = useState('');
 
+  // ページネーション用の状態
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12; // 1ページあたり12件表示
+
   // 活動種別の日本語表示マッピング
   const activityTypeMapping: Record<string, { text: string, bgColor: string, textColor: string }> = {
     visit: { text: '訪問', bgColor: 'bg-blue-100', textColor: 'text-blue-800' },
@@ -72,24 +76,33 @@ export default function ActivitiesPage() {
     setViewAllActivities(!viewAllActivities);
   };
 
-  // フィルタリングされた活動リストを取得
+  // 検索とフィルタリングを適用した活動リスト
   const filteredActivities = activities.filter(activity => {
-    const customerName = activity.customers?.name || '不明';
-    const dealName = activity.deals?.name || '-';
-    const salesRepName = activity.sales_reps?.name || '不明';
+    // 検索条件
+    const searchMatch = !searchTerm || 
+      (activity.description && activity.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (activity.customers?.name && activity.customers.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (activity.deals?.name && activity.deals.name.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const matchesSearch = 
-      searchTerm === '' || 
-      customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (dealName !== '-' && dealName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      activity.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      salesRepName.toLowerCase().includes(searchTerm.toLowerCase());
+    // 活動種別フィルター
+    const typeMatch = !activityTypeFilter || activity.activity_type === activityTypeFilter;
     
-    const matchesActivityType = activityTypeFilter === '' || activity.activity_type === activityTypeFilter;
-    const matchesSalesRep = salesRepFilter === '' || activity.sales_rep_id === salesRepFilter;
+    // 営業担当者フィルター
+    const repMatch = !salesRepFilter || activity.sales_rep_id === salesRepFilter;
     
-    return matchesSearch && matchesActivityType && matchesSalesRep;
+    return searchMatch && typeMatch && repMatch;
   });
+
+  // ページネーション用のデータ
+  const pageNumbers = [];
+  for (let i = 1; i <= Math.ceil(filteredActivities.length / itemsPerPage); i++) {
+    pageNumbers.push(i);
+  }
+
+  // 現在のページに表示する活動リスト
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentActivities = filteredActivities.slice(indexOfFirstItem, indexOfLastItem);
 
   // 活動記録ページへ移動
   const handleAddActivity = () => {
@@ -213,8 +226,8 @@ export default function ActivitiesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredActivities.length > 0 ? (
-                  filteredActivities.map((activity) => (
+                {currentActivities.length > 0 ? (
+                  currentActivities.map((activity) => (
                     <tr key={activity.id} className="border-b hover:bg-muted/30">
                       <td className="px-4 py-3 text-sm">{formatDate(activity.date || activity.created_at)}</td>
                       <td className="px-4 py-3 text-sm font-medium">{activity.customers?.name || '不明'}</td>
@@ -271,6 +284,54 @@ export default function ActivitiesPage() {
               </tbody>
             </table>
           </div>
+          
+          {/* ページネーション */}
+          {filteredActivities.length > 0 && (
+            <div className="flex justify-center mt-6">
+              <div className="flex gap-1">
+                {/* 前のページへ */}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1.5 rounded-md text-sm ${
+                    currentPage === 1 
+                      ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                      : 'bg-muted hover:bg-muted/80 text-foreground'
+                  }`}
+                >
+                  前へ
+                </button>
+                
+                {/* ページ番号 */}
+                {pageNumbers.map(number => (
+                  <button 
+                    key={number} 
+                    onClick={() => setCurrentPage(number)}
+                    className={`px-3 py-1.5 rounded-md text-sm ${
+                      currentPage === number 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-muted hover:bg-muted/80 text-foreground'
+                    }`}
+                  >
+                    {number}
+                  </button>
+                ))}
+                
+                {/* 次のページへ */}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, pageNumbers.length))}
+                  disabled={currentPage === pageNumbers.length || pageNumbers.length === 0}
+                  className={`px-3 py-1.5 rounded-md text-sm ${
+                    currentPage === pageNumbers.length || pageNumbers.length === 0
+                      ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                      : 'bg-muted hover:bg-muted/80 text-foreground'
+                  }`}
+                >
+                  次へ
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </MainLayout>
